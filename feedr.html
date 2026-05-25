@@ -254,9 +254,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
   <div id="screen-home" class="screen">
     <div class="nav">
-      <div class="nav-left"><button class="nav-btn" id="btn-reorder">Reorder</button></div>
+      <div class="nav-left"></div>
       <div class="nav-title">My Feeds</div>
       <div class="nav-right">
+        <button class="nav-icon-btn" id="btn-reorder" aria-label="Reorder feeds" title="Reorder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><polyline points="8 6 3 9 8 12"/><polyline points="16 18 21 15 16 12"/></svg>
+        </button>
         <div class="sort-dropdown">
           <button class="sort-btn" id="btn-sort" aria-label="Sort feeds">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
@@ -760,10 +763,7 @@ function buildFeedCard(f, draggable, isHidden=false) {
     <div class="feed-meta">${f.accounts.length} account${f.accounts.length!==1?'s':''}</div>
     <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>`;
   if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(f.id, isHidden));
-  card.addEventListener('dragstart', e => onDragStart(e, f.id));
-  card.addEventListener('dragover',  e => onDragOver(e, f.id));
-  card.addEventListener('drop',      e => onDrop(e, f.id));
-  card.addEventListener('dragend',   onDragEnd);
+  card.addEventListener('touchstart', e => touchDragStart(e, card, f.id, 'feed'), {passive:false});
   return card;
 }
 
@@ -810,22 +810,120 @@ function renderHome() {
 // ── Reorder ────────────────────────────────────────────────────────────────
 function toggleReorder() {
   AppState.reorderMode = !AppState.reorderMode;
-  document.getElementById('btn-reorder').textContent = AppState.reorderMode ? 'Done' : 'Reorder';
+  const btn = document.getElementById('btn-reorder');
+  btn.style.background = AppState.reorderMode ? 'var(--blue)' : '';
+  btn.style.color = AppState.reorderMode ? '#fff' : '';
   document.getElementById('reorder-bar').classList.toggle('visible', AppState.reorderMode);
   renderHome();
 }
 
-function onDragStart(e, id)  { AppState.dragSrcId = id; e.dataTransfer.effectAllowed = 'move'; }
-function onDragOver(e, id)   { e.preventDefault(); document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over')); if(id!==AppState.dragSrcId) document.getElementById(`card-${id}`)?.classList.add('drag-over'); }
-function onDrop(e, targetId) {
-  e.preventDefault();
-  if (!AppState.dragSrcId || AppState.dragSrcId===targetId) return;
-  const ids = Repo.getFeeds().map(f=>f.id);
-  const fi=ids.indexOf(AppState.dragSrcId), ti=ids.indexOf(targetId);
-  ids.splice(fi,1); ids.splice(ti,0,AppState.dragSrcId);
-  Repo.reorder(ids); scheduleSyncToGist(); renderHome();
-}
-function onDragEnd() { document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over')); AppState.dragSrcId=null; }
+// ── Touch-based drag-to-reorder (works on iOS Safari) ────────────────────
+const TouchDrag = {
+  el: null, clone: null, srcId: null, type: null,
+  startY: 0, startX: 0, offsetY: 0,
+
+  start(e, el, id, type) {
+    if (type === 'feed' && !AppState.reorderMode) return;
+    if (type === 'acct' && !AppState.feedReorderMode) return;
+    e.preventDefault();
+    this.el   = el;
+    this.srcId = id;
+    this.type  = type;
+    const touch = e.touches[0];
+    const rect  = el.getBoundingClientRect();
+    this.startY  = touch.clientY;
+    this.startX  = touch.clientX;
+    this.offsetY = touch.clientY - rect.top;
+
+    this.clone = el.cloneNode(true);
+    this.clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:0.85;z-index:999;pointer-events:none;border-radius:13px;box-shadow:0 4px 20px rgba(0,0,0,0.2);`;
+    document.body.appendChild(this.clone);
+    el.style.opacity = '0.3';
+  },
+
+  move(e) {
+    if (!this.clone) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect  = this.el.getBoundingClientRect();
+    this.clone.style.top = `${touch.clientY - this.offsetY}px`;
+
+    // Find element under finger
+    this.clone.style.display = 'none';
+    const under = document.elementFromPoint(touch.clientX, touch.clientY);
+    this.clone.style.display = '';
+
+    const targetCard = this.type === 'feed'
+      ? under?.closest('.feed-card')
+      : under?.closest('.account-row');
+
+    if (this.type === 'feed') {
+      document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over'));
+      if (targetCard && targetCard.id !== `card-${this.srcId}`) targetCard.classList.add('drag-over');
+    } else {
+      document.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
+      if (targetCard && targetCard.dataset.accountId !== this.srcId) targetCard.classList.add('drag-over-acct');
+    }
+  },
+
+  end(e) {
+    if (!this.clone) return;
+    const touch = e.changedTouches[0];
+
+    this.clone.style.display = 'none';
+    const under = document.elementFromPoint(touch.clientX, touch.clientY);
+    this.clone.style.display = '';
+
+    if (this.type === 'feed') {
+      const targetCard = under?.closest('.feed-card');
+      const targetId   = targetCard?.id?.replace('card-','');
+      document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over'));
+      if (targetId && targetId !== this.srcId) {
+        const ids = Repo.getFeeds().map(f=>f.id);
+        const fi=ids.indexOf(this.srcId), ti=ids.indexOf(targetId);
+        if (fi>=0 && ti>=0) { ids.splice(fi,1); ids.splice(ti,0,this.srcId); Repo.reorder(ids); scheduleSyncToGist(); }
+      }
+    } else {
+      const targetRow = under?.closest('.account-row');
+      const targetId  = targetRow?.dataset?.accountId;
+      document.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
+      if (targetId && targetId !== this.srcId) {
+        const feed = getCurrentFeed();
+        if (feed) {
+          const ids = feed.accounts.map(a=>a.id);
+          const fi=ids.indexOf(this.srcId), ti=ids.indexOf(targetId);
+          if (fi>=0 && ti>=0) { const [m]=feed.accounts.splice(fi,1); feed.accounts.splice(ti,0,m); saveCurrentFeed(feed); scheduleSyncToGist(); }
+        }
+      }
+    }
+
+    this.el.style.opacity = '';
+    document.body.removeChild(this.clone);
+    this.clone = null; this.el = null; this.srcId = null; this.type = null;
+
+    if (this.type === 'feed' || AppState.reorderMode) renderHome();
+    else renderFeed();
+  }
+};
+
+// Re-render after drop
+const _origTouchEnd = TouchDrag.end.bind(TouchDrag);
+TouchDrag.end = function(e) {
+  const type = this.type;
+  _origTouchEnd(e);
+  if (type === 'feed') renderHome();
+  else renderFeed();
+};
+
+function touchDragStart(e, el, id, type) { TouchDrag.start(e, el, id, type); }
+
+document.addEventListener('touchmove',  e => { if (TouchDrag.clone) TouchDrag.move(e); },  {passive:false});
+document.addEventListener('touchend',   e => { if (TouchDrag.clone) TouchDrag.end(e); },   {passive:false});
+document.addEventListener('touchcancel',e => {
+  if (TouchDrag.el)    TouchDrag.el.style.opacity='';
+  if (TouchDrag.clone) { try{document.body.removeChild(TouchDrag.clone);}catch{} }
+  TouchDrag.clone=null; TouchDrag.el=null; TouchDrag.srcId=null; TouchDrag.type=null;
+});
 
 // ── Create Feed ────────────────────────────────────────────────────────────
 function openCreateSheet() {
@@ -891,7 +989,7 @@ function renderAccountList(accounts, totalCount) {
            ${platformPillHTML(a.platform)}
          </div>`;
     return `
-    <div class="account-row${reorder?' draggable-acct':''}" data-account-id="${esc(a.id)}" draggable="${reorder}">
+    <div class="account-row${reorder?' draggable-acct':''}" data-account-id="${esc(a.id)}">
       <div class="acct-drag-handle" data-account-id="${esc(a.id)}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       </div>
@@ -993,34 +1091,10 @@ function bindFeedEvents() {
       if (removeBtn) removeAccount(removeBtn.dataset.accountId);
       if (editBtn)   openEditAccountSheet(editBtn.dataset.accountId);
     });
-    list.addEventListener('dragstart', e => {
-      const row = e.target.closest('[data-account-id]');
-      if (row) { AppState.dragSrcAcctId = row.dataset.accountId; e.dataTransfer.effectAllowed='move'; }
+    list.querySelectorAll('.acct-drag-handle').forEach(handle => {
+      const row = handle.closest('.account-row');
+      if (row) handle.addEventListener('touchstart', e => touchDragStart(e, row, row.dataset.accountId, 'acct'), {passive:false});
     });
-    list.addEventListener('dragover', e => {
-      e.preventDefault();
-      const row = e.target.closest('[data-account-id]');
-      list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
-      if (row && row.dataset.accountId !== AppState.dragSrcAcctId) row.classList.add('drag-over-acct');
-    });
-    list.addEventListener('drop', e => {
-      e.preventDefault();
-      const row = e.target.closest('[data-account-id]');
-      if (!row || !AppState.dragSrcAcctId || row.dataset.accountId===AppState.dragSrcAcctId) return;
-      const feed = getCurrentFeed();
-      if (!feed) return;
-      const ids = feed.accounts.map(a=>a.id);
-      const fi=ids.indexOf(AppState.dragSrcAcctId), ti=ids.indexOf(row.dataset.accountId);
-      if (fi<0||ti<0) return;
-      const [moved] = feed.accounts.splice(fi,1);
-      feed.accounts.splice(ti,0,moved);
-      saveCurrentFeed(feed);
-      scheduleSyncToGist();
-      list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
-      AppState.dragSrcAcctId=null;
-      renderFeed();
-    });
-    list.addEventListener('dragend', ()=>{ list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct')); AppState.dragSrcAcctId=null; });
   }
 }
 
@@ -1380,7 +1454,7 @@ function toggleHomeSort(mode) {
   document.getElementById('sort-az').classList.toggle('active', AppState.homeSortAZ);
   document.getElementById('sort-menu').classList.remove('open');
   if (AppState.homeSortAZ && AppState.reorderMode) toggleReorder();
-  document.getElementById('btn-reorder').style.display = AppState.homeSortAZ ? 'none' : '';
+  document.getElementById('btn-reorder').style.display = AppState.homeSortAZ ? 'none' : 'flex';
   renderHome();
 }
 
