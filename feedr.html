@@ -165,6 +165,47 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;}
 @keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Sort dropdown ── */
+.sort-dropdown{position:relative;display:inline-block;}
+.sort-btn{width:34px;height:34px;border-radius:var(--radius-full);background:var(--surface2);border:none;color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.sort-btn svg{width:17px;height:17px;}
+.sort-menu{display:none;position:absolute;right:0;top:42px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-sm);min-width:160px;z-index:100;overflow:hidden;}
+.sort-menu.open{display:block;}
+.sort-menu-item{padding:12px 16px;font-size:15px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sort-menu-item:not(:last-child){border-bottom:0.5px solid var(--border);}
+.sort-menu-item.active{color:var(--blue);}
+.sort-check{font-size:18px;line-height:1;opacity:0;color:var(--blue);}
+.sort-menu-item.active .sort-check{opacity:1;}
+
+/* ── Feed account reorder ── */
+.feed-reorder-bar{display:none;padding:8px 16px;background:rgba(0,122,255,0.08);border-bottom:0.5px solid var(--blue);flex-shrink:0;font-size:13px;color:var(--blue);font-weight:500;text-align:center;}
+.feed-reorder-bar.visible{display:block;}
+.acct-drag-handle{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:grab;flex-shrink:0;display:none;}
+.acct-drag-handle svg{width:16px;height:16px;}
+.feed-reorder-mode .acct-drag-handle{display:flex;}
+.feed-reorder-mode .btn-edit-acct,.feed-reorder-mode .btn-remove{display:none;}
+.account-row.drag-over-acct{border-top:2px solid var(--blue);}
+
+/* ── Hidden feeds section ── */
+.hidden-section-header{display:flex;align-items:center;gap:8px;padding:16px 0 8px;font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;}
+.hidden-section-header svg{width:14px;height:14px;color:var(--text3);}
+
+/* ── PIN overlay ── */
+.pin-overlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:400;flex-direction:column;align-items:center;justify-content:center;gap:24px;}
+.pin-overlay.open{display:flex;}
+.pin-dots{display:flex;gap:16px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--text3);background:transparent;transition:background 0.15s;}
+.pin-dot.filled{background:var(--text);border-color:var(--text);}
+.pin-dot.error{background:var(--red);border-color:var(--red);}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;}
+.pin-key{width:72px;height:72px;border-radius:50%;background:var(--surface2);border:none;font-size:22px;font-weight:400;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity 0.1s;}
+.pin-key:active{opacity:0.5;}
+.pin-key.del{font-size:16px;background:none;}
+.pin-key.empty{background:none;pointer-events:none;}
+.pin-forgot{background:none;border:none;color:var(--text2);font-size:14px;cursor:pointer;padding:8px;}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(6px);}}
+.pin-dots.shake{animation:shake 0.4s ease;}
 </style>
 </head>
 <body>
@@ -216,6 +257,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div class="nav-left"><button class="nav-btn" id="btn-reorder">Reorder</button></div>
       <div class="nav-title">My Feeds</div>
       <div class="nav-right">
+        <div class="sort-dropdown">
+          <button class="sort-btn" id="btn-sort" aria-label="Sort feeds">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+          </button>
+          <div class="sort-menu" id="sort-menu">
+            <div class="sort-menu-item active" id="sort-custom" data-sort="custom">Custom order <span class="sort-check">&#x2022;</span></div>
+            <div class="sort-menu-item" id="sort-az" data-sort="az">A to Z <span class="sort-check">&#x2022;</span></div>
+          </div>
+        </div>
         <button class="nav-icon-btn" id="btn-sync" aria-label="Sync now">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
@@ -253,11 +303,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
       <div class="nav-title" id="feed-nav-title">Feed</div>
       <div class="nav-right">
+        <button class="nav-btn" id="btn-feed-reorder" style="font-size:15px;">Reorder</button>
+        <button class="nav-icon-btn" id="btn-feed-sort" aria-label="Sort accounts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+        </button>
         <button class="nav-icon-btn" id="btn-edit-feed" aria-label="Edit feed">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
       </div>
     </div>
+    <div class="feed-reorder-bar" id="feed-reorder-bar">Drag accounts to reorder — tap Done when finished</div>
     <div class="search-wrap">
       <div class="search-inner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -319,6 +374,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <button class="btn-sheet-cancel" id="btn-cancel-edit">Cancel</button>
         <button class="btn-sheet-save" id="btn-save-edit">Save Changes</button>
       </div>
+      <button class="btn-sheet-save" id="btn-toggle-hide-feed" style="background:var(--surface2);color:var(--text);border:0.5px solid var(--border);">Hide this feed</button>
       <button class="btn-sheet-delete" id="btn-delete-feed">Delete Feed</button>
     </div>
   </div>
@@ -330,11 +386,54 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div style="font-size:13px;color:var(--text2);margin-top:-8px;" id="edit-acct-username"></div>
       <div class="field">
         <label for="inp-edit-acct-name">Display name</label>
-        <input id="inp-edit-acct-name" placeholder="e.g. BAMIDELE — leave blank to show username" maxlength="50" autocorrect="off" spellcheck="false"/>
+        <input id="inp-edit-acct-name" placeholder="e.g. FRED HAMPTON — leave blank to show username" maxlength="50" autocorrect="off" spellcheck="false"/>
       </div>
       <div class="sheet-actions">
         <button class="btn-sheet-cancel" id="btn-cancel-edit-acct">Cancel</button>
         <button class="btn-sheet-save" id="btn-save-edit-acct">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN overlay -->
+  <div class="pin-overlay" id="pin-overlay">
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-keypad" id="pin-keypad">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key empty" data-key=""></button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key del" data-key="del">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+      </button>
+    </div>
+    <button class="pin-forgot" id="btn-pin-forgot">Forgot PIN</button>
+  </div>
+
+  <!-- Set PIN sheet -->
+  <div class="sheet-backdrop" id="sheet-set-pin">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Set a PIN</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;">Choose a 4-digit PIN to protect your hidden feeds. If you forget it, hidden feeds will be permanently deleted — no recovery.</div>
+      <div class="field"><label for="inp-pin-new">PIN</label><input id="inp-pin-new" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"/></div>
+      <div class="field"><label for="inp-pin-confirm">Confirm PIN</label><input id="inp-pin-confirm" type="password" inputmode="numeric" maxlength="4" placeholder="Repeat PIN"/></div>
+      <div class="setup-error" id="pin-set-error"></div>
+      <div class="sheet-actions">
+        <button class="btn-sheet-cancel" id="btn-cancel-set-pin">Cancel</button>
+        <button class="btn-sheet-save" id="btn-save-set-pin">Set PIN</button>
       </div>
     </div>
   </div>
@@ -346,6 +445,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 // ── Fix 5: monotonic uid counter prevents duplicate IDs under rapid adds ───
 let _uidCounter = 0;
 const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
+
+// ── Option 2: App version — increment this string for every release ────────
+// Format: YYYY.MM.DD.n (year.month.day.build)
+// Never change STORAGE_KEY — change APP_VERSION instead.
+// MigrationService runs automatically when version in storage differs from this.
+const APP_VERSION  = '2026.05.25.1';
+const VERSION_KEY  = 'feedr_appversion';
 
 // ── Platform Registry (Open/Closed — extend here only) ────────────────────
 const PLATFORMS = {
@@ -393,10 +499,23 @@ const UrlDetector = ((platformKeys) => {
   };
 })(PLATFORM_KEYS);
 
-// ── Fix 3: MigrationService runs once at startup, writes result, never repeats
+// ── MigrationService — version-aware, runs only when version changes ─────────
 const MigrationService = {
+  // Returns true if stored version differs from current app version
+  needsMigration() {
+    return localStorage.getItem(VERSION_KEY) !== APP_VERSION;
+  },
+
+  // Stamp the current version into storage after migration completes
+  stampVersion() {
+    try { localStorage.setItem(VERSION_KEY, APP_VERSION); } catch(e) { console.error('MigrationService.stampVersion', e); }
+  },
+
+  // Run all data migrations. Safe to call on any data — each step is idempotent.
   run(data) {
     if (!data || !data.feeds) return { feeds: [] };
+
+    // Migration 1: convert legacy string accounts to objects (v1 → v2)
     data.feeds = data.feeds.map(feed => {
       if (!feed.accounts || !feed.accounts.length) return feed;
       feed.accounts = feed.accounts.map(acct => {
@@ -406,7 +525,20 @@ const MigrationService = {
       });
       return feed;
     });
+
+    // Future migrations go here — each one is a clearly labelled block:
+    // Migration 2: example placeholder
+    // data.feeds = data.feeds.map(feed => { ... return feed; });
+
     return data;
+  },
+
+  // Entry point — only runs migration if version has changed, then stamps it
+  runIfNeeded(data) {
+    if (!this.needsMigration()) return data;
+    const migrated = this.run(data);
+    this.stampVersion();
+    return migrated;
   }
 };
 
@@ -427,9 +559,26 @@ const Repo = (() => {
     getCreds:   ()     => loadC(),
     saveCreds:  (c)    => saveC(c),
     clearCreds: ()     => { try { localStorage.removeItem('feedr_creds'); } catch {} },
-    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); } catch {} }
+    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); } catch {} },
+    getHidden:  ()     => { try { return JSON.parse(localStorage.getItem('feedr_hidden')) || { feeds:[] }; } catch { return { feeds:[] }; } },
+    saveHidden: (d)    => { try { localStorage.setItem('feedr_hidden', JSON.stringify(d)); } catch(e) { console.error('Repo.saveHidden',e); } },
+    getHiddenFeeds: () => { try { return JSON.parse(localStorage.getItem('feedr_hidden'))?.feeds || []; } catch { return []; } },
+    saveHiddenFeed: (feed) => { const d=JSON.parse(localStorage.getItem('feedr_hidden')||'{"feeds":[]}'); const i=d.feeds.findIndex(f=>f.id===feed.id); i>=0?d.feeds[i]=feed:d.feeds.push(feed); localStorage.setItem('feedr_hidden',JSON.stringify(d)); },
+    deleteHiddenFeed: (id) => { const d=JSON.parse(localStorage.getItem('feedr_hidden')||'{"feeds":[]}'); d.feeds=d.feeds.filter(f=>f.id!==id); localStorage.setItem('feedr_hidden',JSON.stringify(d)); },
+    clearHidden: ()    => { try { localStorage.removeItem('feedr_hidden'); } catch {} }
   };
 })();
+
+// ── PinService — PIN stored locally only, never synced ───────────────────
+const PinService = {
+  KEY: 'feedr_pin',
+  get()         { return localStorage.getItem(this.KEY) || null; },
+  set(pin)      { localStorage.setItem(this.KEY, pin); },
+  clear()       { localStorage.removeItem(this.KEY); },
+  exists()      { return !!this.get(); },
+  verify(pin)   { return this.get() === pin; },
+  wipeHidden()  { Repo.clearHidden(); this.clear(); }
+};
 
 // ── Fix 4: GistService.read uses single network call ─────────────────────
 const GistService = (() => {
@@ -480,12 +629,20 @@ const AppState = {
   currentFeedId:      null,
   searchQuery:        '',
   reorderMode:        false,
+  feedReorderMode:    false,
+  feedSortAZ:         false,
+  homeSortAZ:         false,
   dragSrcId:          null,
+  dragSrcAcctId:      null,
   syncTimer:          null,
   detectedPlatform:   null,
   manualPlatform:     null,
   editingAccountId:   null,
-  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; this.editingAccountId=null; },
+  hiddenVisible:      false,
+  pinBuffer:          '',
+  pinTapCount:        0,
+  pinTapTimer:        null,
+  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; this.editingAccountId=null; this.feedReorderMode=false; this.feedSortAZ=false; },
   resetAddBar() { this.detectedPlatform=null; this.manualPlatform=null; }
 };
 
@@ -591,40 +748,63 @@ function showHome() {
 function goHome() { showHome(); }
 
 // ── Home Screen ────────────────────────────────────────────────────────────
+function buildFeedCard(f, draggable, isHidden=false) {
+  const card = document.createElement('div');
+  card.className = 'feed-card';
+  card.id = `card-${f.id}`;
+  card.draggable = draggable;
+  card.dataset.hidden = isHidden ? '1' : '0';
+  card.innerHTML = `
+    <div class="reorder-handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+    <div class="feed-name">${esc(f.name)}</div>
+    <div class="feed-meta">${f.accounts.length} account${f.accounts.length!==1?'s':''}</div>
+    <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>`;
+  if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(f.id, isHidden));
+  card.addEventListener('dragstart', e => onDragStart(e, f.id));
+  card.addEventListener('dragover',  e => onDragOver(e, f.id));
+  card.addEventListener('drop',      e => onDrop(e, f.id));
+  card.addEventListener('dragend',   onDragEnd);
+  return card;
+}
+
 function renderHome() {
-  const feeds    = Repo.getFeeds();
+  let feeds = Repo.getFeeds();
   const scrollEl = document.getElementById('home-scroll');
   document.getElementById('btn-reorder').style.display = feeds.length ? '' : 'none';
 
-  if (!feeds.length) {
+  if (AppState.homeSortAZ) {
+    feeds = [...feeds].sort((a,b) => a.name.localeCompare(b.name));
+  }
+
+  scrollEl.innerHTML = '';
+
+  if (!feeds.length && !AppState.hiddenVisible) {
     scrollEl.innerHTML = `<div class="empty"><div class="empty-title">No feeds yet</div><div class="empty-sub">Tap New Feed to create your first category and start organizing the accounts you follow across Instagram, TikTok, X, Threads, and YouTube</div></div>`;
     return;
   }
 
-  const grid = document.createElement('div');
-  grid.className = 'feed-grid' + (AppState.reorderMode ? ' reorder-mode' : '');
-  grid.id = 'feed-grid';
+  if (feeds.length) {
+    const grid = document.createElement('div');
+    grid.className = 'feed-grid' + (AppState.reorderMode ? ' reorder-mode' : '');
+    grid.id = 'feed-grid';
+    feeds.forEach(f => grid.appendChild(buildFeedCard(f, AppState.reorderMode, false)));
+    scrollEl.appendChild(grid);
+  }
 
-  feeds.forEach(f => {
-    const card = document.createElement('div');
-    card.className = 'feed-card';
-    card.id = `card-${f.id}`;
-    card.draggable = AppState.reorderMode;
-    card.innerHTML = `
-      <div class="reorder-handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-      <div class="feed-name">${esc(f.name)}</div>
-      <div class="feed-meta">${f.accounts.length} account${f.accounts.length!==1?'s':''}</div>
-      <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>`;
-    if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(f.id));
-    card.addEventListener('dragstart', e => onDragStart(e, f.id));
-    card.addEventListener('dragover',  e => onDragOver(e, f.id));
-    card.addEventListener('drop',      e => onDrop(e, f.id));
-    card.addEventListener('dragend',   onDragEnd);
-    grid.appendChild(card);
-  });
-
-  scrollEl.innerHTML = '';
-  scrollEl.appendChild(grid);
+  if (AppState.hiddenVisible) {
+    const hiddenFeeds = Repo.getHiddenFeeds();
+    if (hiddenFeeds.length) {
+      let hf = AppState.homeSortAZ ? [...hiddenFeeds].sort((a,b)=>a.name.localeCompare(b.name)) : hiddenFeeds;
+      const header = document.createElement('div');
+      header.className = 'hidden-section-header';
+      header.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Hidden feeds`;
+      scrollEl.appendChild(header);
+      const hGrid = document.createElement('div');
+      hGrid.className = 'feed-grid';
+      hf.forEach(f => hGrid.appendChild(buildFeedCard(f, false, true)));
+      scrollEl.appendChild(hGrid);
+    }
+  }
 }
 
 // ── Reorder ────────────────────────────────────────────────────────────────
@@ -681,13 +861,13 @@ function renderAddBar() {
       <input id="inp-add-account" type="text" placeholder="Paste a link or @username" maxlength="200" autocorrect="off" autocapitalize="none" spellcheck="false"/>
       <button class="add-btn" id="btn-add-account">Add</button>
     </div>
-    <div class="detect-strip${AppState.detectedPlatform?'.visible':''}" id="detect-strip">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    <div class="detect-strip${AppState.detectedPlatform ? ' visible' : ''}" id="detect-strip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
       <span id="detect-label">${AppState.detectedPlatform ? `${PLATFORMS[AppState.detectedPlatform.platform].label} detected · @${esc(AppState.detectedPlatform.username)}` : ''}</span>
     </div>
     <div class="platform-picker" id="platform-picker">${ppBtns}</div>
     <div class="display-name-row" id="display-name-row" style="display:none;">
-      <input id="inp-display-name" type="text" placeholder="Display name — optional e.g. BAMIDELE" maxlength="50" autocorrect="off" spellcheck="false"/>
+      <input id="inp-display-name" type="text" placeholder="Display name — optional e.g. FRED HAMPTON" maxlength="50" autocorrect="off" spellcheck="false"/>
     </div>
   </div>`;
 }
@@ -696,7 +876,9 @@ function renderAccountList(accounts, totalCount) {
   if (!accounts.length) {
     return `<div class="no-results">No accounts match your search</div>`;
   }
-  const rows = accounts.map(a => {
+  let sorted = AppState.feedSortAZ ? [...accounts].sort((a,b)=>(a.displayName||a.username).localeCompare(b.displayName||b.username)) : accounts;
+  const reorder = AppState.feedReorderMode;
+  const rows = sorted.map(a => {
     const hasName = a.displayName && a.displayName.trim();
     const nameHTML = hasName
       ? `<div class="acct-display-name">${esc(a.displayName)}</div>
@@ -709,7 +891,10 @@ function renderAccountList(accounts, totalCount) {
            ${platformPillHTML(a.platform)}
          </div>`;
     return `
-    <div class="account-row" data-account-id="${esc(a.id)}">
+    <div class="account-row${reorder?' draggable-acct':''}" data-account-id="${esc(a.id)}" draggable="${reorder}">
+      <div class="acct-drag-handle" data-account-id="${esc(a.id)}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </div>
       <div class="avatar" style="background:${avatarColor(a.username)}">${hasName ? esc(a.displayName).slice(0,2).toUpperCase() : initials(a.username)}</div>
       <div class="account-info">${nameHTML}</div>
       <div class="account-row-actions">
@@ -723,7 +908,8 @@ function renderAccountList(accounts, totalCount) {
       </div>
     </div>`;
   }).join('');
-  return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount!==1?'s':''}</div><div class="account-list">${rows}</div>`;
+  const listClass = `account-list${reorder?' feed-reorder-mode':''}`;
+  return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount!==1?'s':''}</div><div class="${listClass}">${rows}</div>`;
 }
 
 function renderEmptyFeed() {
@@ -731,11 +917,24 @@ function renderEmptyFeed() {
 }
 
 // ── Fix 1 & 12: renderFeed uses sub-renderers, preserves input value ──────
+function getCurrentFeed() {
+  return AppState.currentFeedHidden
+    ? Repo.getHiddenFeeds().find(f=>f.id===AppState.currentFeedId) || null
+    : Repo.getFeed(AppState.currentFeedId);
+}
+
+function saveCurrentFeed(feed) {
+  if (AppState.currentFeedHidden) Repo.saveHiddenFeed(feed);
+  else Repo.saveFeed(feed);
+}
+
 function renderFeed() {
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) { goHome(); return; }
 
   document.getElementById('feed-nav-title').textContent = esc(feed.name);
+  const feedReorderBar = document.getElementById('feed-reorder-bar');
+  if (feedReorderBar) feedReorderBar.classList.toggle('visible', AppState.feedReorderMode);
   const q        = AppState.searchQuery.toLowerCase();
   const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)||((a.displayName||'').toLowerCase().includes(q))) : feed.accounts;
   const el       = document.getElementById('feed-scroll');
@@ -794,15 +993,46 @@ function bindFeedEvents() {
       if (removeBtn) removeAccount(removeBtn.dataset.accountId);
       if (editBtn)   openEditAccountSheet(editBtn.dataset.accountId);
     });
+    list.addEventListener('dragstart', e => {
+      const row = e.target.closest('[data-account-id]');
+      if (row) { AppState.dragSrcAcctId = row.dataset.accountId; e.dataTransfer.effectAllowed='move'; }
+    });
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      const row = e.target.closest('[data-account-id]');
+      list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
+      if (row && row.dataset.accountId !== AppState.dragSrcAcctId) row.classList.add('drag-over-acct');
+    });
+    list.addEventListener('drop', e => {
+      e.preventDefault();
+      const row = e.target.closest('[data-account-id]');
+      if (!row || !AppState.dragSrcAcctId || row.dataset.accountId===AppState.dragSrcAcctId) return;
+      const feed = getCurrentFeed();
+      if (!feed) return;
+      const ids = feed.accounts.map(a=>a.id);
+      const fi=ids.indexOf(AppState.dragSrcAcctId), ti=ids.indexOf(row.dataset.accountId);
+      if (fi<0||ti<0) return;
+      const [moved] = feed.accounts.splice(fi,1);
+      feed.accounts.splice(ti,0,moved);
+      saveCurrentFeed(feed);
+      scheduleSyncToGist();
+      list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
+      AppState.dragSrcAcctId=null;
+      renderFeed();
+    });
+    list.addEventListener('dragend', ()=>{ list.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct')); AppState.dragSrcAcctId=null; });
   }
 }
 
 // ── Feed Screen ────────────────────────────────────────────────────────────
-function openFeed(id) {
-  AppState.currentFeedId = id;
-  AppState.searchQuery   = '';
+function openFeed(id, isHidden=false) {
+  AppState.currentFeedId  = id;
+  AppState.currentFeedHidden = isHidden;
+  AppState.searchQuery    = '';
   AppState.detectedPlatform = null;
   AppState.manualPlatform   = null;
+  AppState.feedReorderMode  = false;
+  AppState.feedSortAZ       = false;
   document.getElementById('search-input').value = '';
   document.getElementById('search-clear').style.display = 'none';
   showScreen('screen-feed');
@@ -889,7 +1119,7 @@ function addAccount() {
   const dnInp = document.getElementById('inp-display-name');
   const displayName = dnInp ? dnInp.value.trim() : '';
   feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, displayName, addedAt:Date.now() });
-  Repo.saveFeed(feed);
+  saveCurrentFeed(feed);
   inp.value='';
   if (dnInp) dnInp.value='';
   AppState.resetAddBar();
@@ -899,11 +1129,11 @@ function addAccount() {
 }
 
 function removeAccount(accountId) {
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) return;
   const acct = feed.accounts.find(a=>a.id===accountId);
   feed.accounts = feed.accounts.filter(a=>a.id!==accountId);
-  Repo.saveFeed(feed);
+  saveCurrentFeed(feed);
   scheduleSyncToGist();
   renderFeed();
   if (acct) toast(`@${acct.username} removed`);
@@ -927,7 +1157,7 @@ function openProfile(platform, username) {
 
 // ── Edit Account (display name) ────────────────────────────────────────────
 function openEditAccountSheet(accountId) {
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) return;
   const acct = feed.accounts.find(a => a.id === accountId);
   if (!acct) return;
@@ -938,12 +1168,12 @@ function openEditAccountSheet(accountId) {
 }
 
 function saveAccountEdit() {
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed || !AppState.editingAccountId) return;
   const acct = feed.accounts.find(a => a.id === AppState.editingAccountId);
   if (!acct) return;
   acct.displayName = document.getElementById('inp-edit-acct-name').value.trim();
-  Repo.saveFeed(feed);
+  saveCurrentFeed(feed);
   AppState.editingAccountId = null;
   closeSheet('sheet-edit-account');
   scheduleSyncToGist();
@@ -967,19 +1197,21 @@ function clearSearch() {
 
 // ── Edit Feed ──────────────────────────────────────────────────────────────
 function openEditSheet() {
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) return;
   document.getElementById('inp-edit-name').value = feed.name;
+  const hideBtn = document.getElementById('btn-toggle-hide-feed');
+  if (hideBtn) hideBtn.textContent = AppState.currentFeedHidden ? 'Unhide this feed' : 'Hide this feed';
   openSheet('sheet-edit');
 }
 
 function updateFeed() {
   const name = document.getElementById('inp-edit-name').value.trim();
   if (!name) return;
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) return;
   feed.name = name;
-  Repo.saveFeed(feed);
+  saveCurrentFeed(feed);
   closeSheet('sheet-edit');
   scheduleSyncToGist();
   renderFeed();
@@ -988,12 +1220,168 @@ function updateFeed() {
 
 function deleteFeed() {
   if (!AppState.currentFeedId) return;
-  const feed = Repo.getFeed(AppState.currentFeedId);
-  Repo.deleteFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
+  if (AppState.currentFeedHidden) Repo.deleteHiddenFeed(AppState.currentFeedId);
+  else Repo.deleteFeed(AppState.currentFeedId);
   closeSheet('sheet-edit');
   scheduleSyncToGist();
   goHome();
   toast(`"${feed?.name}" deleted`);
+}
+
+function toggleHideFeed() {
+  const feed = getCurrentFeed();
+  if (!feed) return;
+  closeSheet('sheet-edit');
+  if (AppState.currentFeedHidden) {
+    Repo.deleteHiddenFeed(feed.id);
+    Repo.saveFeed(feed);
+    toast(`"${feed.name}" is now visible`);
+    scheduleSyncToGist();
+    goHome();
+  } else {
+    if (!PinService.exists()) {
+      AppState._pendingHideFeedId = feed.id;
+      openSheet('sheet-set-pin');
+    } else {
+      Repo.deleteFeed(feed.id);
+      Repo.saveHiddenFeed(feed);
+      scheduleSyncToGist();
+      toast(`"${feed.name}" hidden`);
+      goHome();
+    }
+  }
+}
+
+function completeHideFeed(feedId) {
+  const feed = Repo.getFeed(feedId);
+  if (!feed) return;
+  Repo.deleteFeed(feedId);
+  Repo.saveHiddenFeed(feed);
+  scheduleSyncToGist();
+  toast(`"${feed.name}" hidden`);
+  goHome();
+}
+
+// ── PIN system ────────────────────────────────────────────────────────────
+function openPinOverlay() {
+  AppState.pinBuffer = '';
+  updatePinDots();
+  document.getElementById('pin-overlay').classList.add('open');
+}
+
+function closePinOverlay() {
+  AppState.pinBuffer = '';
+  document.getElementById('pin-overlay').classList.remove('open');
+}
+
+function updatePinDots(error=false) {
+  for (let i=0; i<4; i++) {
+    const dot = document.getElementById(`pd${i}`);
+    dot.classList.toggle('filled', i < AppState.pinBuffer.length);
+    dot.classList.toggle('error', error);
+  }
+}
+
+function pinKeyPress(key) {
+  if (key === 'del') {
+    AppState.pinBuffer = AppState.pinBuffer.slice(0,-1);
+    updatePinDots();
+    return;
+  }
+  if (key === '' || AppState.pinBuffer.length >= 4) return;
+  AppState.pinBuffer += key;
+  updatePinDots();
+  if (AppState.pinBuffer.length === 4) {
+    setTimeout(() => {
+      if (PinService.verify(AppState.pinBuffer)) {
+        closePinOverlay();
+        AppState.hiddenVisible = true;
+        renderHome();
+      } else {
+        updatePinDots(true);
+        const dots = document.getElementById('pin-dots');
+        dots.classList.add('shake');
+        setTimeout(() => { dots.classList.remove('shake'); AppState.pinBuffer=''; updatePinDots(); }, 450);
+      }
+    }, 80);
+  }
+}
+
+function forgotPin() {
+  PinService.wipeHidden();
+  AppState.hiddenVisible = false;
+  closePinOverlay();
+}
+
+function saveSetPin() {
+  const p1 = document.getElementById('inp-pin-new').value;
+  const p2 = document.getElementById('inp-pin-confirm').value;
+  const err = document.getElementById('pin-set-error');
+  if (p1.length !== 4 || !/^\d{4}$/.test(p1)) { err.textContent='PIN must be exactly 4 digits'; return; }
+  if (p1 !== p2) { err.textContent='PINs do not match'; return; }
+  PinService.set(p1);
+  closeSheet('sheet-set-pin');
+  document.getElementById('inp-pin-new').value='';
+  document.getElementById('inp-pin-confirm').value='';
+  err.textContent='';
+  if (AppState._pendingHideFeedId) {
+    completeHideFeed(AppState._pendingHideFeedId);
+    AppState._pendingHideFeedId = null;
+  }
+}
+
+// Triple-tap sync dot to open PIN
+function handleSyncDotTap() {
+  AppState.pinTapCount++;
+  clearTimeout(AppState.pinTapTimer);
+  if (AppState.pinTapCount >= 3) {
+    AppState.pinTapCount = 0;
+    if (PinService.exists()) openPinOverlay();
+    else if (Repo.getHiddenFeeds().length === 0) openSheet('sheet-set-pin');
+    else openPinOverlay();
+    return;
+  }
+  AppState.pinTapTimer = setTimeout(() => {
+    if (AppState.pinTapCount === 1) manualSync(true);
+    AppState.pinTapCount = 0;
+  }, 400);
+}
+
+// Auto-hide on background
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    AppState.hiddenVisible = false;
+    closePinOverlay();
+  }
+  if (document.visibilityState === 'visible') {
+    window.scrollTo(0, 0);
+    document.documentElement.style.zoom = '1';
+    if (AppState.hiddenVisible) { AppState.hiddenVisible=false; renderHome(); }
+  }
+});
+
+// ── Feed account reorder ───────────────────────────────────────────────────
+function toggleFeedReorder() {
+  AppState.feedReorderMode = !AppState.feedReorderMode;
+  document.getElementById('btn-feed-reorder').textContent = AppState.feedReorderMode ? 'Done' : 'Reorder';
+  renderFeed();
+}
+
+function toggleFeedSortAZ() {
+  AppState.feedSortAZ = !AppState.feedSortAZ;
+  renderFeed();
+}
+
+// ── Home sort ─────────────────────────────────────────────────────────────
+function toggleHomeSort(mode) {
+  AppState.homeSortAZ = mode === 'az';
+  document.getElementById('sort-custom').classList.toggle('active', !AppState.homeSortAZ);
+  document.getElementById('sort-az').classList.toggle('active', AppState.homeSortAZ);
+  document.getElementById('sort-menu').classList.remove('open');
+  if (AppState.homeSortAZ && AppState.reorderMode) toggleReorder();
+  document.getElementById('btn-reorder').style.display = AppState.homeSortAZ ? 'none' : '';
+  renderHome();
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
@@ -1054,7 +1442,7 @@ function importData(e) {
     try {
       const raw  = JSON.parse(ev.target.result);
       if (!raw.feeds) throw new Error('Invalid format');
-      const data = MigrationService.run(raw);
+      const data = MigrationService.runIfNeeded(raw);
       Repo.replaceAll(data);
       scheduleSyncToGist();
       toast('Feeds imported successfully');
@@ -1093,7 +1481,7 @@ async function connectGist() {
   try {
     const remote = await GistService.read(token, gistId);
     Repo.saveCreds({ token, gistId });
-    if (remote && remote.feeds && remote.feeds.length) { Repo.replaceAll(MigrationService.run(remote)); toast('Feeds restored from GitHub'); }
+    if (remote && remote.feeds && remote.feeds.length) { Repo.replaceAll(MigrationService.runIfNeeded(remote)); toast('Feeds restored from GitHub'); }
     showHome();
     manualSync(true);
   } catch(e) {
@@ -1128,6 +1516,31 @@ function bindAppEvents() {
   document.getElementById('search-input').addEventListener('input', onSearch);
   document.getElementById('search-clear').addEventListener('click', clearSearch);
 
+  // Sort dropdown
+  document.getElementById('btn-sort').addEventListener('click', e => { e.stopPropagation(); document.getElementById('sort-menu').classList.toggle('open'); });
+  document.getElementById('sort-custom').addEventListener('click', () => toggleHomeSort('custom'));
+  document.getElementById('sort-az').addEventListener('click', () => toggleHomeSort('az'));
+  document.addEventListener('click', e => { if (!e.target.closest('.sort-dropdown')) document.getElementById('sort-menu').classList.remove('open'); });
+
+  // Sync dot triple tap
+  document.getElementById('sync-bar').addEventListener('click', handleSyncDotTap);
+  document.getElementById('sync-dot').addEventListener('click', e => { e.stopPropagation(); handleSyncDotTap(); });
+
+  // Feed reorder and sort
+  document.getElementById('btn-feed-reorder').addEventListener('click', toggleFeedReorder);
+  document.getElementById('btn-feed-sort').addEventListener('click', toggleFeedSortAZ);
+
+  // PIN overlay keypad
+  document.getElementById('pin-keypad').addEventListener('click', e => { const btn=e.target.closest('.pin-key'); if(btn) pinKeyPress(btn.dataset.key); });
+  document.getElementById('btn-pin-forgot').addEventListener('click', forgotPin);
+
+  // Set PIN sheet
+  document.getElementById('btn-cancel-set-pin').addEventListener('click', () => { closeSheet('sheet-set-pin'); AppState._pendingHideFeedId=null; });
+  document.getElementById('btn-save-set-pin').addEventListener('click', saveSetPin);
+
+  // Toggle hide feed
+  document.getElementById('btn-toggle-hide-feed').addEventListener('click', toggleHideFeed);
+
   // Settings screen
   document.getElementById('btn-back-settings').addEventListener('click', goHome);
   document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
@@ -1159,13 +1572,7 @@ function bindAppEvents() {
   // Keyboard
   document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.sheet-backdrop.open').forEach(s=>s.classList.remove('open')); });
 
-// Bug 2 fix: reset scroll and zoom when PWA is reopened from Home Screen
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    window.scrollTo(0, 0);
-    document.documentElement.style.zoom = '1';
-  }
-});
+
 }
 
 // ── Init — routes to setup when no credentials exist, home when they do ───
@@ -1176,15 +1583,19 @@ document.addEventListener('visibilitychange', () => {
   if (raw) {
     try {
       const parsed   = JSON.parse(raw);
-      const migrated = MigrationService.run(parsed);
+      // runIfNeeded only migrates when APP_VERSION differs from stored version
+      // No migration needed → returns data unchanged, zero overhead
+      const migrated = MigrationService.runIfNeeded(parsed);
       Repo.replaceAll(migrated);
     } catch { Repo.replaceAll({ feeds:[] }); }
+  } else {
+    // Fresh install — stamp version immediately so migration never runs unnecessarily
+    MigrationService.stampVersion();
   }
   if (creds.token && creds.gistId) {
     showHome();
     manualSync();
   } else {
-    // No credentials saved — always show setup so user is never silently unconnected
     showScreen('screen-setup');
   }
 })();
