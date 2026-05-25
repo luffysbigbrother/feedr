@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Feedr">
+<meta name="theme-color" content="#ffffff">
+<title>Feedr</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#f2f2f7;--surface:#ffffff;--surface2:#f2f2f7;--surface3:#e5e5ea;
+  --border:rgba(0,0,0,0.1);--text:#000000;--text2:#6c6c70;--text3:#aeaeb2;
+  --blue:#007aff;--red:#ff3b30;--green:#34c759;--orange:#ff9500;
+  --radius:13px;--radius-sm:10px;--radius-full:999px;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#000;--surface:#1c1c1e;--surface2:#2c2c2e;--surface3:#3a3a3c;
+  --border:rgba(255,255,255,0.1);--text:#fff;--text2:rgba(235,235,245,0.6);
+  --text3:rgba(235,235,245,0.25);--blue:#0a84ff;--red:#ff453a;--green:#30d158;--orange:#ff9f0a;}
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,'SF Pro Text',BlinkMacSystemFont,sans-serif;}
+#app{height:100%;display:flex;flex-direction:column;}
+.screen{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.screen.active{display:flex;}
+
+.nav{padding:calc(var(--safe-top) + 12px) 16px 10px;background:var(--surface);border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
+.nav-title{font-size:17px;font-weight:600;color:var(--text);flex:1;text-align:center;}
+.nav-left,.nav-right{min-width:72px;display:flex;align-items:center;}
+.nav-right{justify-content:flex-end;gap:8px;}
+.nav-btn{background:none;border:none;color:var(--blue);font-size:17px;cursor:pointer;padding:4px 2px;display:flex;align-items:center;gap:3px;}
+.nav-icon-btn{width:34px;height:34px;border-radius:var(--radius-full);background:var(--surface2);border:none;color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.nav-icon-btn svg{width:17px;height:17px;}
+
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(16px + var(--safe-bottom));}
+.setup-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 20px calc(32px + var(--safe-bottom));}
+.setup-logo{text-align:center;margin-bottom:28px;}
+.setup-logo-title{font-size:28px;font-weight:700;color:var(--text);}
+.setup-logo-sub{font-size:15px;color:var(--text2);margin-top:4px;}
+.setup-card{background:var(--surface);border-radius:var(--radius);border:0.5px solid var(--border);overflow:hidden;margin-bottom:16px;}
+.setup-section-label{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;padding:0 4px;margin:20px 0 8px;}
+.setup-row{padding:14px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:0.5px solid var(--border);}
+.setup-row:last-child{border-bottom:none;}
+.setup-row-label{font-size:13px;color:var(--text2);font-weight:500;}
+.setup-row input{background:none;border:none;outline:none;font-size:16px;color:var(--text);width:100%;font-family:inherit;}
+.setup-row input::placeholder{color:var(--text3);}
+.setup-note{background:rgba(0,122,255,0.08);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:16px;}
+.setup-note strong{font-weight:600;}
+.btn-setup-primary{width:100%;padding:15px;border-radius:var(--radius);background:var(--blue);color:#fff;border:none;font-size:17px;font-weight:600;cursor:pointer;margin-bottom:12px;}
+.btn-setup-primary:active{opacity:0.8;}
+.btn-setup-secondary{width:100%;padding:13px;border-radius:var(--radius);background:var(--surface);border:0.5px solid var(--border);color:var(--text2);font-size:15px;cursor:pointer;}
+.setup-error{color:var(--red);font-size:14px;text-align:center;min-height:20px;margin-bottom:8px;}
+.setup-step{display:flex;gap:12px;align-items:flex-start;padding:10px 0;}
+.setup-step-num{width:26px;height:26px;border-radius:var(--radius-full);background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.setup-step-text{font-size:14px;color:var(--text);line-height:1.5;}
+.setup-step-text strong{font-weight:600;}
+.setup-divider{height:0.5px;background:var(--border);margin:8px 0;}
+
+.sync-bar{padding:6px 16px;display:flex;align-items:center;gap:6px;font-size:12px;flex-shrink:0;border-bottom:0.5px solid var(--border);background:var(--surface);}
+.sync-dot{width:7px;height:7px;border-radius:var(--radius-full);flex-shrink:0;}
+.sync-dot.ok{background:var(--green);}
+.sync-dot.syncing{background:var(--orange);}
+.sync-dot.error{background:var(--red);}
+.sync-label{color:var(--text2);}
+
+.feed-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.feed-card{background:var(--surface);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:6px;cursor:pointer;border:0.5px solid var(--border);transition:opacity 0.15s;position:relative;user-select:none;}
+.feed-card:active{opacity:0.6;}
+.feed-card.drag-over{border:2px solid var(--blue);}
+.feed-name{font-size:15px;font-weight:600;color:var(--text);}
+.feed-meta{font-size:12px;color:var(--text2);}
+.feed-platforms{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
+.reorder-handle{position:absolute;top:10px;right:10px;color:var(--text3);padding:4px;display:none;}
+.reorder-handle svg{width:16px;height:16px;}
+.reorder-mode .reorder-handle{display:block;}
+.reorder-mode .feed-card{cursor:grab;}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:12px;padding:40px 24px;text-align:center;}
+.empty-title{font-size:19px;font-weight:600;}
+.empty-sub{font-size:15px;color:var(--text2);line-height:1.5;}
+
+.fab-wrap{padding:12px 16px calc(12px + var(--safe-bottom));background:var(--bg);flex-shrink:0;}
+.fab{width:100%;height:50px;border-radius:var(--radius-full);background:var(--blue);color:#fff;border:none;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.fab:active{opacity:0.8;}
+.fab svg{width:20px;height:20px;}
+
+.reorder-bar{display:none;padding:8px 16px;background:rgba(0,122,255,0.08);border-bottom:0.5px solid var(--blue);flex-shrink:0;font-size:13px;color:var(--blue);font-weight:500;text-align:center;}
+.reorder-bar.visible{display:block;}
+
+.search-wrap{padding:8px 16px 6px;background:var(--surface);border-bottom:0.5px solid var(--border);flex-shrink:0;}
+.search-inner{display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:var(--radius-sm);padding:8px 12px;}
+.search-inner svg{width:16px;height:16px;color:var(--text3);flex-shrink:0;}
+.search-inner input{flex:1;background:none;border:none;outline:none;font-size:16px;color:var(--text);}
+.search-inner input::placeholder{color:var(--text3);}
+.search-clear{background:var(--text3);border:none;border-radius:var(--radius-full);width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.search-clear svg{width:10px;height:10px;color:var(--surface);}
+
+.add-section{padding:12px 0 4px;}
+.add-bar{display:flex;gap:8px;margin-bottom:8px;}
+.add-bar input{flex:1;padding:10px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;outline:none;transition:border-color 0.15s;}
+.add-bar input:focus{border-color:var(--blue);}
+.add-bar input.detected{border-color:var(--green);}
+.add-btn{padding:10px 16px;border-radius:var(--radius-sm);background:var(--blue);color:#fff;border:none;font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap;}
+
+.detect-strip{display:none;align-items:center;gap:6px;padding:6px 10px;background:rgba(52,199,89,0.1);border-radius:var(--radius-sm);margin-bottom:10px;font-size:13px;color:#1a7f37;}
+.detect-strip.visible{display:flex;}
+.detect-strip svg{width:14px;height:14px;flex-shrink:0;}
+
+.platform-picker{display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.platform-picker.visible{display:flex;}
+.pp-btn{padding:5px 12px;border-radius:var(--radius-full);border:0.5px solid var(--border);background:var(--surface2);font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all 0.15s;}
+.pp-btn.selected{border-color:var(--blue);background:rgba(0,122,255,0.08);color:var(--blue);}
+
+.section-header{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;}
+.account-list{display:flex;flex-direction:column;gap:1px;border-radius:var(--radius);overflow:hidden;border:0.5px solid var(--border);}
+.account-row{background:var(--surface);padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.account-row:not(:last-child){border-bottom:0.5px solid var(--border);}
+.avatar{width:42px;height:42px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff;flex-shrink:0;}
+.account-info{flex:1;min-width:0;}
+.account-username{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.platform-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;margin-top:3px;}
+.account-row-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.btn-open{padding:6px 14px;border-radius:var(--radius-full);background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-remove{width:30px;height:30px;border-radius:var(--radius-full);background:rgba(255,59,48,0.12);border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.btn-remove svg{width:14px;height:14px;}
+.no-results{padding:32px 16px;text-align:center;color:var(--text2);font-size:15px;}
+
+.sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center;}
+.sheet-backdrop.open{display:flex;}
+.sheet{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:20px 20px calc(20px + var(--safe-bottom));display:flex;flex-direction:column;gap:18px;}
+.sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:-8px auto 0;}
+.sheet-title{font-size:18px;font-weight:700;color:var(--text);}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:13px;color:var(--text2);font-weight:500;}
+.field input{padding:12px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;outline:none;width:100%;}
+.field input:focus{border-color:var(--blue);}
+.sheet-actions{display:flex;gap:10px;}
+.btn-sheet-cancel{flex:1;padding:13px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;}
+.btn-sheet-save{flex:2;padding:13px;border-radius:var(--radius-sm);background:var(--blue);color:#fff;border:none;font-size:16px;font-weight:600;cursor:pointer;}
+.btn-sheet-delete{width:100%;padding:13px;border-radius:var(--radius-sm);background:rgba(255,59,48,0.1);border:none;color:var(--red);font-size:16px;font-weight:600;cursor:pointer;}
+
+.toast{position:fixed;bottom:calc(80px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,0.82);color:#fff;padding:10px 20px;border-radius:var(--radius-full);font-size:14px;font-weight:500;opacity:0;transition:opacity 0.2s,transform 0.2s;z-index:300;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="screen-setup" class="screen active">
+    <div class="nav">
+      <div class="nav-left"></div>
+      <div class="nav-title">Welcome to Feedr</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="setup-wrap">
+      <div class="setup-logo">
+        <div class="setup-logo-title">Feedr</div>
+        <div class="setup-logo-sub">Your social feeds, organized your way</div>
+      </div>
+      <div class="setup-note">
+        <strong>Your data stays yours.</strong> Feedr uses your own private GitHub Gist to store your feeds across Instagram, TikTok, X, Threads, and YouTube — no shared servers, no third-party accounts.
+      </div>
+      <div class="setup-section-label">Your GitHub credentials</div>
+      <div class="setup-card">
+        <div class="setup-row">
+          <div class="setup-row-label">Personal Access Token</div>
+          <input id="inp-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+        </div>
+        <div class="setup-row">
+          <div class="setup-row-label">Gist ID</div>
+          <input id="inp-gist" type="text" placeholder="abc123def456abc123def456abc1" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+        </div>
+      </div>
+      <div class="setup-error" id="setup-error"></div>
+      <button class="btn-setup-primary" id="btn-connect">Connect & Get Started</button>
+      <button class="btn-setup-secondary" id="btn-local">Use without sync (this device only)</button>
+      <div class="setup-divider" style="margin:24px 0 16px;"></div>
+      <div class="setup-section-label">How to get your credentials</div>
+      <div class="setup-card" style="padding:4px 16px 8px;">
+        <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <strong>github.com</strong> and sign in or create a free account</div></div>
+        <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Go to <strong>Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</strong></div></div>
+        <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Click <strong>Generate new token</strong>, name it "Feedr", set expiration to <strong>No expiration</strong>, check only the <strong>gist</strong> scope</div></div>
+        <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Copy the token — starts with <strong>ghp_</strong> — and paste above. You only see it once</div></div>
+        <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">Go to <strong>gist.github.com</strong>, create a new Secret Gist, filename <strong>feedr-data.json</strong>, content <strong>{}</strong></div></div>
+        <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Copy the <strong>Gist ID</strong> from the URL (the long string after your username) and paste above</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-home" class="screen">
+    <div class="nav">
+      <div class="nav-left"><button class="nav-btn" id="btn-reorder">Reorder</button></div>
+      <div class="nav-title">My Feeds</div>
+      <div class="nav-right">
+        <button class="nav-icon-btn" id="btn-sync" aria-label="Sync now">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button class="nav-icon-btn" id="btn-settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="sync-bar" id="sync-bar" style="display:none;">
+      <div class="sync-dot ok" id="sync-dot"></div>
+      <span class="sync-label" id="sync-label">Synced</span>
+    </div>
+    <div class="reorder-bar" id="reorder-bar">Drag cards to reorder — tap Done when finished</div>
+    <div class="scroll" id="home-scroll"></div>
+    <div class="fab-wrap">
+      <button class="fab" id="btn-new-feed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Feed
+      </button>
+    </div>
+  </div>
+
+  <div id="screen-feed" class="screen">
+    <div class="nav">
+      <div class="nav-left">
+        <button class="nav-btn" id="btn-back-home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="15 18 9 12 15 6"/></svg>
+          Feeds
+        </button>
+      </div>
+      <div class="nav-title" id="feed-nav-title">Feed</div>
+      <div class="nav-right">
+        <button class="nav-icon-btn" id="btn-edit-feed" aria-label="Edit feed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <div class="search-inner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="search" placeholder="Search accounts" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+        <button class="search-clear" id="search-clear" style="display:none" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll" id="feed-scroll"></div>
+  </div>
+
+  <div id="screen-settings" class="screen">
+    <div class="nav">
+      <div class="nav-left"><button class="nav-btn" id="btn-back-settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="15 18 9 12 15 6"/></svg> Back</button></div>
+      <div class="nav-title">Settings</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="setup-wrap">
+      <div class="setup-section-label">GitHub sync</div>
+      <div class="setup-card">
+        <div class="setup-row"><div class="setup-row-label">Personal Access Token</div><input id="settings-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocorrect="off" autocapitalize="none" spellcheck="false"/></div>
+        <div class="setup-row"><div class="setup-row-label">Gist ID</div><input id="settings-gist" type="text" placeholder="abc123def456" autocorrect="off" autocapitalize="none" spellcheck="false"/></div>
+      </div>
+      <div class="setup-error" id="settings-error"></div>
+      <button class="btn-setup-primary" id="btn-save-settings">Save & Reconnect</button>
+      <div class="setup-section-label" style="margin-top:24px;">Data</div>
+      <div class="setup-card">
+        <div class="setup-row" style="flex-direction:row;justify-content:space-between;align-items:center;"><div style="font-size:15px;color:var(--text);">Export feeds as JSON</div><button class="nav-btn" id="btn-export">Export</button></div>
+        <div class="setup-row" style="flex-direction:row;justify-content:space-between;align-items:center;border-bottom:none;"><div style="font-size:15px;color:var(--text);">Import feeds from JSON</div><button class="nav-btn" id="btn-import-trigger">Import</button></div>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none"/>
+      <div style="margin-top:24px;">
+        <button class="btn-sheet-delete" id="btn-reset" style="border-radius:var(--radius);padding:14px;width:100%;">Reset app & clear all data</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="sheet-create">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">New feed</div>
+      <div class="field"><label for="inp-create-name">Feed name</label><input id="inp-create-name" placeholder="e.g. Travel, Recipes, Fitness" maxlength="30"/></div>
+      <div class="sheet-actions">
+        <button class="btn-sheet-cancel" id="btn-cancel-create">Cancel</button>
+        <button class="btn-sheet-save" id="btn-save-create">Create Feed</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="sheet-edit">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Edit feed</div>
+      <div class="field"><label for="inp-edit-name">Feed name</label><input id="inp-edit-name" maxlength="30"/></div>
+      <div class="sheet-actions">
+        <button class="btn-sheet-cancel" id="btn-cancel-edit">Cancel</button>
+        <button class="btn-sheet-save" id="btn-save-edit">Save Changes</button>
+      </div>
+      <button class="btn-sheet-delete" id="btn-delete-feed">Delete Feed</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ── Fix 5: monotonic uid counter prevents duplicate IDs under rapid adds ───
+let _uidCounter = 0;
+const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
+
+// ── Platform Registry (Open/Closed — extend here only) ────────────────────
+const PLATFORMS = {
+  instagram: { label:'Instagram', color:'#c2185b', bg:'#fce4ec', darkColor:'#f48fb1', darkBg:'#4a0d25', profileUrl:(u)=>`https://www.instagram.com/${u}/`,   domains:['instagram.com'] },
+  tiktok:    { label:'TikTok',    color:'#311b92', bg:'#ede7f6', darkColor:'#b39ddb', darkBg:'#1a0a3d', profileUrl:(u)=>`https://www.tiktok.com/@${u}`,       domains:['tiktok.com','vm.tiktok.com','vt.tiktok.com'] },
+  x:         { label:'X',         color:'#0d47a1', bg:'#e3f2fd', darkColor:'#90caf9', darkBg:'#0a2540', profileUrl:(u)=>`https://www.x.com/${u}`,              domains:['x.com','twitter.com'] },
+  threads:   { label:'Threads',   color:'#1b5e20', bg:'#e8f5e9', darkColor:'#a5d6a7', darkBg:'#0a2e0d', profileUrl:(u)=>`https://www.threads.net/@${u}`,       domains:['threads.net'] },
+  youtube:   { label:'YouTube',   color:'#b71c1c', bg:'#ffebee', darkColor:'#ef9a9a', darkBg:'#3d0a0a', profileUrl:(u)=>u.startsWith('UC')?`https://www.youtube.com/channel/${u}`:`https://www.youtube.com/@${u}`, domains:['youtube.com','youtu.be','m.youtube.com'] }
+};
+const PLATFORM_KEYS = Object.keys(PLATFORMS);
+
+// ── Fix 7: dark mode evaluated once per render, not per element ───────────
+const Theme = { isDark: () => window.matchMedia('(prefers-color-scheme: dark)').matches };
+
+// ── URL Detection Service (Fix 13: explicit PLATFORM_KEYS dependency) ─────
+const UrlDetector = ((platformKeys) => {
+  const stripProtocol = (u) => u.replace(/^https?:\/\//i,'').replace(/^www\./i,'');
+
+  const extractors = {
+    instagram: (p) => { const m=p.match(/^instagram\.com\/([a-z0-9._]+)\/?/i); return m&&!['p','reel','reels','stories','explore','tv'].includes(m[1])?m[1]:null; },
+    tiktok:    (p) => { const m=p.match(/^(?:(?:www\.|vm\.|vt\.)?tiktok\.com)\/@([a-z0-9._]+)/i); return m?m[1]:null; },
+    x:         (p) => { const m=p.match(/^(?:(?:www\.)?(?:x|twitter)\.com)\/([a-z0-9_]+)\/?/i); return m&&!['home','explore','notifications','messages','i','search'].includes(m[1])?m[1]:null; },
+    threads:   (p) => { const m=p.match(/^(?:www\.)?threads\.net\/@([a-z0-9._]+)/i); return m?m[1]:null; },
+    youtube:   (p) => {
+      let m;
+      if((m=p.match(/^(?:www\.)?youtube\.com\/@([a-z0-9._-]+)/i))) return m[1];
+      if((m=p.match(/^(?:www\.)?youtube\.com\/channel\/(UC[a-z0-9_-]+)/i))) return m[1];
+      if((m=p.match(/^(?:www\.)?youtube\.com\/c\/([a-z0-9._-]+)/i))) return m[1];
+      if((m=p.match(/^(?:www\.)?youtube\.com\/user\/([a-z0-9._-]+)/i))) return m[1];
+      return null;
+    }
+  };
+
+  return {
+    detect(raw) {
+      if (!raw) return null;
+      const normalized = stripProtocol(raw.trim());
+      for (const key of platformKeys) {
+        const username = extractors[key](normalized);
+        if (username) return { platform: key, username: username.replace(/^@/,'') };
+      }
+      return null;
+    },
+    isUrl: (raw) => raw.includes('.com') || raw.includes('://') || raw.includes('youtu.be')
+  };
+})(PLATFORM_KEYS);
+
+// ── Fix 3: MigrationService runs once at startup, writes result, never repeats
+const MigrationService = {
+  run(data) {
+    if (!data || !data.feeds) return { feeds: [] };
+    data.feeds = data.feeds.map(feed => {
+      if (!feed.accounts || !feed.accounts.length) return feed;
+      feed.accounts = feed.accounts.map(acct => {
+        if (typeof acct === 'string') return { id: uid(), username: acct, platform: 'instagram', addedAt: Date.now() };
+        if (!acct.id) acct.id = uid();
+        return acct;
+      });
+      return feed;
+    });
+    return data;
+  }
+};
+
+// ── Repository (no migration on every read — Fix 3) ───────────────────────
+const Repo = (() => {
+  const load  = ()  => { try { return JSON.parse(localStorage.getItem('feedr_v4')) || { feeds:[] }; } catch { return { feeds:[] }; } };
+  const save  = (d) => { try { localStorage.setItem('feedr_v4', JSON.stringify(d)); } catch(e) { console.error('Repo.save',e); } };
+  const loadC = ()  => { try { return JSON.parse(localStorage.getItem('feedr_creds')) || {}; } catch { return {}; } };
+  const saveC = (c) => { try { localStorage.setItem('feedr_creds', JSON.stringify(c)); } catch(e) { console.error('Repo.saveC',e); } };
+  return {
+    getFeeds:   ()     => load().feeds,
+    getFeed:    (id)   => load().feeds.find(f=>f.id===id) || null,
+    saveFeed:   (feed) => { const d=load(); const i=d.feeds.findIndex(f=>f.id===feed.id); i>=0?d.feeds[i]=feed:d.feeds.push(feed); save(d); },
+    deleteFeed: (id)   => { const d=load(); d.feeds=d.feeds.filter(f=>f.id!==id); save(d); },
+    reorder:    (ids)  => { const d=load(); d.feeds=ids.map(id=>d.feeds.find(f=>f.id===id)).filter(Boolean); save(d); },
+    getAllData:  ()     => load(),
+    replaceAll: (data) => save(data),
+    getCreds:   ()     => loadC(),
+    saveCreds:  (c)    => saveC(c),
+    clearCreds: ()     => { try { localStorage.removeItem('feedr_creds'); } catch {} },
+    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); } catch {} }
+  };
+})();
+
+// ── Fix 4: GistService.read uses single network call ─────────────────────
+const GistService = (() => {
+  const BASE = 'https://api.github.com';
+  const FILENAME = 'feedr-data.json';
+  const hdrs = (t) => ({ 'Authorization':`token ${t}`, 'Content-Type':'application/json', 'Accept':'application/vnd.github.v3+json' });
+
+  const fetchGist = async (token, gistId) => {
+    const r = await fetch(`${BASE}/gists/${gistId}`, { headers: hdrs(token) });
+    if (!r.ok) throw new Error(r.status===401?'Invalid token':r.status===404?'Gist not found':`Error ${r.status}`);
+    return r.json();
+  };
+
+  return {
+    verify: fetchGist,
+    async read(token, gistId) {
+      const gist = await fetchGist(token, gistId);
+      const file = gist.files[FILENAME];
+      if (!file) return null;
+      try { return JSON.parse(file.content); } catch { return null; }
+    },
+    async write(token, gistId, data) {
+      const r = await fetch(`${BASE}/gists/${gistId}`, { method:'PATCH', headers:hdrs(token), body:JSON.stringify({ files:{ [FILENAME]:{ content:JSON.stringify(data,null,2) } } }) });
+      if (!r.ok) throw new Error(`Sync failed: ${r.status}`);
+    }
+  };
+})();
+
+// ── Fix 13: AccountResolver service — resolution logic out of UI handler ──
+const AccountResolver = {
+  resolve(raw, detectedPlatform, manualPlatform) {
+    if (!raw) return null;
+    if (detectedPlatform) return detectedPlatform;
+    if (UrlDetector.isUrl(raw)) {
+      const result = UrlDetector.detect(raw);
+      if (!result) return { error: 'Could not detect platform — try pasting the full profile URL' };
+      return result;
+    }
+    if (!manualPlatform) return { error: 'Choose a platform first' };
+    const username = raw.replace(/^@/,'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
+    if (!username) return { error: 'Invalid username' };
+    return { platform: manualPlatform, username };
+  }
+};
+
+// ── Fix 11: AppState — single owner of all mutable UI state ──────────────
+const AppState = {
+  currentFeedId:    null,
+  searchQuery:      '',
+  reorderMode:      false,
+  dragSrcId:        null,
+  syncTimer:        null,
+  detectedPlatform: null,
+  manualPlatform:   null,
+  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; },
+  resetAddBar() { this.detectedPlatform=null; this.manualPlatform=null; }
+};
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+const AVATAR_COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#5ac8fa','#ff6b6b','#32ade6','#30b0c7','#ffcc00'];
+const avatarColor   = (s) => AVATAR_COLORS[s.split('').reduce((a,c)=>a+c.charCodeAt(0),0) % AVATAR_COLORS.length];
+const initials      = (s) => s.replace('@','').slice(0,2).toUpperCase();
+const esc           = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const showScreen    = (id) => { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); };
+const openSheet     = (id) => document.getElementById(id).classList.add('open');
+const closeSheet    = (id) => document.getElementById(id).classList.remove('open');
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 2400);
+}
+
+// ── Sync ───────────────────────────────────────────────────────────────────
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  if (!dot) return;
+  dot.className = `sync-dot ${state}`;
+  lbl.textContent = label;
+}
+
+function scheduleSyncToGist() {
+  clearTimeout(AppState.syncTimer);
+  AppState.syncTimer = setTimeout(syncToGist, 1500);
+}
+
+async function syncToGist() {
+  const creds = Repo.getCreds();
+  if (!creds.token || !creds.gistId) return;
+  setSyncStatus('syncing','Syncing…');
+  try { await GistService.write(creds.token, creds.gistId, Repo.getAllData()); setSyncStatus('ok','Synced'); }
+  catch { setSyncStatus('error','Sync failed — check connection'); }
+}
+
+// ── Fix 15: manualSync checks lastSyncedAt before hitting network ─────────
+async function manualSync(force = false) {
+  const creds = Repo.getCreds();
+  if (!creds.token || !creds.gistId) return;
+  const data = Repo.getAllData();
+  const fiveMinutes = 5 * 60 * 1000;
+  if (!force && data.lastSyncedAt && (Date.now() - data.lastSyncedAt) < fiveMinutes) return;
+  setSyncStatus('syncing','Syncing…');
+  try {
+    const remote = await GistService.read(creds.token, creds.gistId);
+    if (remote && remote.feeds) { Repo.replaceAll(remote); renderHome(); }
+    const updated = Repo.getAllData();
+    updated.lastSyncedAt = Date.now();
+    Repo.replaceAll(updated);
+    await GistService.write(creds.token, creds.gistId, updated);
+    setSyncStatus('ok','Synced');
+  } catch { setSyncStatus('error','Sync failed'); toast('Sync failed — check your connection'); }
+}
+
+// ── Platform rendering helpers (Fix 7: dark evaluated once per call) ──────
+function platformPillHTML(platform) {
+  const p = PLATFORMS[platform];
+  if (!p) return `<span class="platform-pill" style="background:var(--surface2);color:var(--text2);">Unknown</span>`;
+  const dark = Theme.isDark();
+  return `<span class="platform-pill" style="background:${dark?p.darkBg:p.bg};color:${dark?p.darkColor:p.color};">${esc(p.label)}</span>`;
+}
+
+function feedPlatformSummary(accounts) {
+  const dark = Theme.isDark();
+  return [...new Set(accounts.map(a=>a.platform).filter(Boolean))].map(key => {
+    const p = PLATFORMS[key];
+    if (!p) return '';
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${dark?p.darkBg:p.bg};color:${dark?p.darkColor:p.color};">${esc(p.label)}</span>`;
+  }).join('');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showHome() {
+  const creds = Repo.getCreds();
+  const syncBar = document.getElementById('sync-bar');
+  syncBar.style.display = creds.token ? 'flex' : 'none';
+  if (creds.token) setSyncStatus('ok','Synced');
+  if (AppState.reorderMode) {
+    AppState.reorderMode = false;
+    document.getElementById('btn-reorder').textContent = 'Reorder';
+    document.getElementById('reorder-bar').classList.remove('visible');
+  }
+  AppState.reset();
+  showScreen('screen-home');
+  renderHome();
+}
+
+function goHome() { showHome(); }
+
+// ── Home Screen ────────────────────────────────────────────────────────────
+function renderHome() {
+  const feeds    = Repo.getFeeds();
+  const scrollEl = document.getElementById('home-scroll');
+  document.getElementById('btn-reorder').style.display = feeds.length ? '' : 'none';
+
+  if (!feeds.length) {
+    scrollEl.innerHTML = `<div class="empty"><div class="empty-title">No feeds yet</div><div class="empty-sub">Tap New Feed to create your first category and start organizing the accounts you follow across Instagram, TikTok, X, Threads, and YouTube</div></div>`;
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'feed-grid' + (AppState.reorderMode ? ' reorder-mode' : '');
+  grid.id = 'feed-grid';
+
+  feeds.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'feed-card';
+    card.id = `card-${f.id}`;
+    card.draggable = AppState.reorderMode;
+    card.innerHTML = `
+      <div class="reorder-handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+      <div class="feed-name">${esc(f.name)}</div>
+      <div class="feed-meta">${f.accounts.length} account${f.accounts.length!==1?'s':''}</div>
+      <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>`;
+    if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(f.id));
+    card.addEventListener('dragstart', e => onDragStart(e, f.id));
+    card.addEventListener('dragover',  e => onDragOver(e, f.id));
+    card.addEventListener('drop',      e => onDrop(e, f.id));
+    card.addEventListener('dragend',   onDragEnd);
+    grid.appendChild(card);
+  });
+
+  scrollEl.innerHTML = '';
+  scrollEl.appendChild(grid);
+}
+
+// ── Reorder ────────────────────────────────────────────────────────────────
+function toggleReorder() {
+  AppState.reorderMode = !AppState.reorderMode;
+  document.getElementById('btn-reorder').textContent = AppState.reorderMode ? 'Done' : 'Reorder';
+  document.getElementById('reorder-bar').classList.toggle('visible', AppState.reorderMode);
+  renderHome();
+}
+
+function onDragStart(e, id)  { AppState.dragSrcId = id; e.dataTransfer.effectAllowed = 'move'; }
+function onDragOver(e, id)   { e.preventDefault(); document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over')); if(id!==AppState.dragSrcId) document.getElementById(`card-${id}`)?.classList.add('drag-over'); }
+function onDrop(e, targetId) {
+  e.preventDefault();
+  if (!AppState.dragSrcId || AppState.dragSrcId===targetId) return;
+  const ids = Repo.getFeeds().map(f=>f.id);
+  const fi=ids.indexOf(AppState.dragSrcId), ti=ids.indexOf(targetId);
+  ids.splice(fi,1); ids.splice(ti,0,AppState.dragSrcId);
+  Repo.reorder(ids); scheduleSyncToGist(); renderHome();
+}
+function onDragEnd() { document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over')); AppState.dragSrcId=null; }
+
+// ── Create Feed ────────────────────────────────────────────────────────────
+function openCreateSheet() {
+  document.getElementById('inp-create-name').value = '';
+  openSheet('sheet-create');
+  setTimeout(()=>document.getElementById('inp-create-name').focus(), 250);
+}
+
+function createFeed() {
+  const name = document.getElementById('inp-create-name').value.trim();
+  if (!name) { document.getElementById('inp-create-name').focus(); return; }
+  Repo.saveFeed({ id:uid(), name, accounts:[], createdAt:Date.now() });
+  closeSheet('sheet-create');
+  scheduleSyncToGist();
+  renderHome();
+  toast('Feed created');
+}
+
+// ── Fix 12: renderFeed broken into focused sub-renderers ──────────────────
+function renderAddBar() {
+  const dark = Theme.isDark();
+  const ppBtns = PLATFORM_KEYS.map(k => {
+    const p   = PLATFORMS[k];
+    const sel = AppState.manualPlatform === k;
+    const bg    = sel ? (dark ? p.darkBg    : p.bg)    : 'var(--surface2)';
+    const color = sel ? (dark ? p.darkColor : p.color) : 'var(--text2)';
+    const border = sel ? (dark ? p.darkColor : p.color) : 'var(--border)';
+    return `<button class="pp-btn${sel?' selected':''}" style="background:${bg};color:${color};border-color:${border};" data-platform="${k}">${esc(p.label)}</button>`;
+  }).join('');
+
+  return `<div class="add-section">
+    <div class="add-bar">
+      <input id="inp-add-account" type="text" placeholder="Paste a link or @username" maxlength="200" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+      <button class="add-btn" id="btn-add-account">Add</button>
+    </div>
+    <div class="detect-strip${AppState.detectedPlatform?'.visible':''}" id="detect-strip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <span id="detect-label">${AppState.detectedPlatform ? `${PLATFORMS[AppState.detectedPlatform.platform].label} detected · @${esc(AppState.detectedPlatform.username)}` : ''}</span>
+    </div>
+    <div class="platform-picker" id="platform-picker">${ppBtns}</div>
+  </div>`;
+}
+
+function renderAccountList(accounts, totalCount) {
+  if (!accounts.length) {
+    return `<div class="no-results">No accounts match your search</div>`;
+  }
+  const rows = accounts.map(a => `
+    <div class="account-row" data-account-id="${esc(a.id)}">
+      <div class="avatar" style="background:${avatarColor(a.username)}">${initials(a.username)}</div>
+      <div class="account-info">
+        <div class="account-username">@${esc(a.username)}</div>
+        ${platformPillHTML(a.platform)}
+      </div>
+      <div class="account-row-actions">
+        <button class="btn-open" data-platform="${esc(a.platform)}" data-username="${esc(a.username)}">Open</button>
+        <button class="btn-remove" data-account-id="${esc(a.id)}" aria-label="Remove @${esc(a.username)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>`).join('');
+  return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount!==1?'s':''}</div><div class="account-list">${rows}</div>`;
+}
+
+function renderEmptyFeed() {
+  return `<div class="empty" style="padding-top:16px;"><div class="empty-title">No accounts yet</div><div class="empty-sub">Paste a profile link from Instagram, TikTok, X, Threads, or YouTube — or type a username and choose a platform</div></div>`;
+}
+
+// ── Fix 1 & 12: renderFeed uses sub-renderers, preserves input value ──────
+function renderFeed() {
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) { goHome(); return; }
+
+  document.getElementById('feed-nav-title').textContent = esc(feed.name);
+  const q        = AppState.searchQuery.toLowerCase();
+  const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)) : feed.accounts;
+  const el       = document.getElementById('feed-scroll');
+
+  const currentInputVal = document.getElementById('inp-add-account')?.value || '';
+
+  const addBarHTML     = renderAddBar();
+  const accountsHTML   = feed.accounts.length ? renderAccountList(filtered, feed.accounts.length) : renderEmptyFeed();
+
+  el.innerHTML = addBarHTML + accountsHTML;
+
+  // Fix 1: restore input value after re-render without clearing user's typing
+  const inp = document.getElementById('inp-add-account');
+  if (inp && currentInputVal) inp.value = currentInputVal;
+
+  // Fix 14: wire events in JS, not inline onclick
+  bindFeedEvents();
+
+  // Restore detect strip visibility state
+  const strip  = document.getElementById('detect-strip');
+  const picker = document.getElementById('platform-picker');
+  if (AppState.detectedPlatform) {
+    strip.classList.add('visible');
+    inp && inp.classList.add('detected');
+  } else if (AppState.manualPlatform !== null || (currentInputVal && !UrlDetector.isUrl(currentInputVal))) {
+    picker.classList.add('visible');
+  }
+}
+
+// ── Fix 14: event delegation bound once per render cycle ─────────────────
+function bindFeedEvents() {
+  const inp = document.getElementById('inp-add-account');
+  if (inp) {
+    inp.addEventListener('input',   onAddInput);
+    inp.addEventListener('keydown', e => { if (e.key==='Enter') addAccount(); });
+  }
+
+  const addBtn = document.getElementById('btn-add-account');
+  if (addBtn) addBtn.addEventListener('click', addAccount);
+
+  const picker = document.getElementById('platform-picker');
+  if (picker) {
+    picker.addEventListener('click', e => {
+      const btn = e.target.closest('[data-platform]');
+      if (btn) selectManualPlatform(btn.dataset.platform);
+    });
+  }
+
+  const list = document.querySelector('.account-list');
+  if (list) {
+    list.addEventListener('click', e => {
+      const openBtn   = e.target.closest('.btn-open');
+      const removeBtn = e.target.closest('.btn-remove');
+      if (openBtn)   openProfile(openBtn.dataset.platform, openBtn.dataset.username);
+      if (removeBtn) removeAccount(removeBtn.dataset.accountId);
+    });
+  }
+}
+
+// ── Feed Screen ────────────────────────────────────────────────────────────
+function openFeed(id) {
+  AppState.currentFeedId = id;
+  AppState.searchQuery   = '';
+  AppState.detectedPlatform = null;
+  AppState.manualPlatform   = null;
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  showScreen('screen-feed');
+  renderFeed();
+}
+
+// ── Fix 1: onAddInput updates AppState without re-rendering the whole feed ─
+function onAddInput() {
+  const val    = document.getElementById('inp-add-account')?.value || '';
+  const strip  = document.getElementById('detect-strip');
+  const picker = document.getElementById('platform-picker');
+  const inp    = document.getElementById('inp-add-account');
+  const lbl    = document.getElementById('detect-label');
+
+  AppState.detectedPlatform = null;
+
+  if (!val.trim()) {
+    strip.classList.remove('visible');
+    picker.classList.remove('visible');
+    inp.classList.remove('detected');
+    return;
+  }
+
+  if (UrlDetector.isUrl(val)) {
+    const result = UrlDetector.detect(val);
+    if (result) {
+      AppState.detectedPlatform = result;
+      lbl.textContent = `${PLATFORMS[result.platform].label} detected · @${result.username}`;
+      strip.classList.add('visible');
+      picker.classList.remove('visible');
+      inp.classList.add('detected');
+    } else {
+      strip.classList.remove('visible');
+      picker.classList.remove('visible');
+      inp.classList.remove('detected');
+    }
+  } else {
+    strip.classList.remove('visible');
+    picker.classList.add('visible');
+    inp.classList.remove('detected');
+  }
+}
+
+// ── Fix 1: selectManualPlatform updates state without full re-render ──────
+function selectManualPlatform(platform) {
+  AppState.manualPlatform = platform;
+  const dark = Theme.isDark();
+  const picker = document.getElementById('platform-picker');
+  picker.querySelectorAll('.pp-btn').forEach(btn => {
+    const k  = btn.dataset.platform;
+    const p  = PLATFORMS[k];
+    const sel = k === platform;
+    btn.style.background   = sel ? (dark ? p.darkBg    : p.bg)    : 'var(--surface2)';
+    btn.style.color        = sel ? (dark ? p.darkColor : p.color) : 'var(--text2)';
+    btn.style.borderColor  = sel ? (dark ? p.darkColor : p.color) : 'var(--border)';
+    btn.classList.toggle('selected', sel);
+  });
+  document.getElementById('inp-add-account')?.focus();
+}
+
+// ── Fix 13: addAccount delegates resolution to AccountResolver ────────────
+function addAccount() {
+  const inp = document.getElementById('inp-add-account');
+  const raw = inp?.value.trim() || '';
+  if (!raw) { inp?.focus(); return; }
+
+  const result = AccountResolver.resolve(raw, AppState.detectedPlatform, AppState.manualPlatform);
+  if (!result) return;
+  if (result.error) { toast(result.error); return; }
+
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) return;
+
+  if (feed.accounts.some(a=>a.username===result.username && a.platform===result.platform)) {
+    toast('Already in this feed'); inp.value=''; return;
+  }
+
+  feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, addedAt:Date.now() });
+  Repo.saveFeed(feed);
+  inp.value='';
+  AppState.resetAddBar();
+  scheduleSyncToGist();
+  renderFeed();
+  toast(`@${result.username} added`);
+}
+
+function removeAccount(accountId) {
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) return;
+  const acct = feed.accounts.find(a=>a.id===accountId);
+  feed.accounts = feed.accounts.filter(a=>a.id!==accountId);
+  Repo.saveFeed(feed);
+  scheduleSyncToGist();
+  renderFeed();
+  if (acct) toast(`@${acct.username} removed`);
+}
+
+// ── Fix 8: openProfile has graceful fallback for unknown platform ─────────
+function openProfile(platform, username) {
+  const p = PLATFORMS[platform];
+  if (!p) { toast(`Unknown platform: ${platform}`); return; }
+  window.open(p.profileUrl(username), '_blank');
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+function onSearch() {
+  AppState.searchQuery = document.getElementById('search-input').value;
+  document.getElementById('search-clear').style.display = AppState.searchQuery ? 'flex' : 'none';
+  renderFeed();
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  AppState.searchQuery = '';
+  document.getElementById('search-clear').style.display = 'none';
+  renderFeed();
+}
+
+// ── Edit Feed ──────────────────────────────────────────────────────────────
+function openEditSheet() {
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) return;
+  document.getElementById('inp-edit-name').value = feed.name;
+  openSheet('sheet-edit');
+}
+
+function updateFeed() {
+  const name = document.getElementById('inp-edit-name').value.trim();
+  if (!name) return;
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) return;
+  feed.name = name;
+  Repo.saveFeed(feed);
+  closeSheet('sheet-edit');
+  scheduleSyncToGist();
+  renderFeed();
+  toast('Feed updated');
+}
+
+function deleteFeed() {
+  if (!AppState.currentFeedId) return;
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  Repo.deleteFeed(AppState.currentFeedId);
+  closeSheet('sheet-edit');
+  scheduleSyncToGist();
+  goHome();
+  toast(`"${feed?.name}" deleted`);
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+function openSettings() {
+  const creds = Repo.getCreds();
+  document.getElementById('settings-token').value = creds.token  || '';
+  document.getElementById('settings-gist').value  = creds.gistId || '';
+  document.getElementById('settings-error').textContent = '';
+  showScreen('screen-settings');
+}
+
+async function saveSettings() {
+  const token  = document.getElementById('settings-token').value.trim();
+  const gistId = document.getElementById('settings-gist').value.trim();
+  const errEl  = document.getElementById('settings-error');
+  errEl.textContent = '';
+  if (!token || !gistId) { errEl.textContent = 'Both fields are required'; return; }
+  try {
+    await GistService.verify(token, gistId);
+    Repo.saveCreds({ token, gistId });
+    await syncToGist();
+    toast('Settings saved');
+    goHome();
+  } catch(e) { errEl.textContent = e.message || 'Could not verify credentials'; }
+}
+
+// ── Fix 9 & 10: exportData wraps blob URL in try/finally; importData fixed order
+function exportData() {
+  let url;
+  try {
+    const blob = new Blob([JSON.stringify(Repo.getAllData(),null,2)], { type:'application/json' });
+    url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'feedr-backup.json'; a.click();
+    toast('Exported feedr-backup.json');
+  } catch(e) { toast('Export failed'); console.error(e); }
+  finally { if (url) URL.revokeObjectURL(url); }
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const raw  = JSON.parse(ev.target.result);
+      if (!raw.feeds) throw new Error('Invalid format');
+      const data = MigrationService.run(raw);
+      Repo.replaceAll(data);
+      scheduleSyncToGist();
+      toast('Feeds imported successfully');
+      goHome();
+    } catch { toast('Could not read file — is it a valid Feedr backup?'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ── Fix 10: resetApp navigates to setup screen explicitly ─────────────────
+function resetApp() {
+  if (!confirm('This will delete all your feeds from this device. Your GitHub Gist will not be affected. Continue?')) return;
+  Repo.clearAll();
+  showScreen('screen-setup');
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────
+async function connectGist() {
+  const token  = document.getElementById('inp-token').value.trim();
+  const gistId = document.getElementById('inp-gist').value.trim();
+  const errEl  = document.getElementById('setup-error');
+  const btn    = document.getElementById('btn-connect');
+  errEl.textContent = '';
+  if (!token || !gistId) { errEl.textContent='Please enter both your token and Gist ID'; return; }
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled  = true;
+  try {
+    const remote = await GistService.read(token, gistId);
+    Repo.saveCreds({ token, gistId });
+    if (remote && remote.feeds && remote.feeds.length) { Repo.replaceAll(MigrationService.run(remote)); toast('Feeds restored from GitHub'); }
+    showHome();
+    manualSync(true);
+  } catch(e) {
+    errEl.textContent = e.message || 'Could not connect. Check your token and Gist ID.';
+    btn.innerHTML = 'Connect & Get Started';
+    btn.disabled  = false;
+  }
+}
+
+// ── Fix 2: useLocalOnly now correctly calls showHome ──────────────────────
+function useLocalOnly() {
+  Repo.clearCreds();
+  showHome();
+}
+
+// ── Fix 14: all event wiring in JS, zero inline onclick in HTML ───────────
+function bindAppEvents() {
+  // Setup screen
+  document.getElementById('btn-connect').addEventListener('click', connectGist);
+  document.getElementById('btn-local').addEventListener('click', useLocalOnly);
+
+  // Home screen
+  document.getElementById('btn-reorder').addEventListener('click', toggleReorder);
+  document.getElementById('btn-sync').addEventListener('click', () => manualSync(true));
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-new-feed').addEventListener('click', openCreateSheet);
+
+  // Feed screen
+  document.getElementById('btn-back-home').addEventListener('click', goHome);
+  document.getElementById('btn-edit-feed').addEventListener('click', openEditSheet);
+  document.getElementById('search-input').addEventListener('input', onSearch);
+  document.getElementById('search-clear').addEventListener('click', clearSearch);
+
+  // Settings screen
+  document.getElementById('btn-back-settings').addEventListener('click', goHome);
+  document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+  document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-import-trigger').addEventListener('click', () => document.getElementById('import-file').click());
+  document.getElementById('import-file').addEventListener('change', importData);
+  document.getElementById('btn-reset').addEventListener('click', resetApp);
+
+  // Create sheet
+  document.getElementById('btn-cancel-create').addEventListener('click', () => closeSheet('sheet-create'));
+  document.getElementById('btn-save-create').addEventListener('click', createFeed);
+  document.getElementById('inp-create-name').addEventListener('keydown', e => { if(e.key==='Enter') createFeed(); });
+
+  // Edit sheet
+  document.getElementById('btn-cancel-edit').addEventListener('click', () => closeSheet('sheet-edit'));
+  document.getElementById('btn-save-edit').addEventListener('click', updateFeed);
+  document.getElementById('btn-delete-feed').addEventListener('click', deleteFeed);
+  document.getElementById('inp-edit-name').addEventListener('keydown', e => { if(e.key==='Enter') updateFeed(); });
+
+  // Sheet backdrop dismiss
+  document.querySelectorAll('.sheet-backdrop').forEach(b => b.addEventListener('click', e => { if(e.target===b) b.classList.remove('open'); }));
+
+  // Keyboard
+  document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.sheet-backdrop.open').forEach(s=>s.classList.remove('open')); });
+}
+
+// ── Fix 2 & 3: Init — migration once, local-only correctly handled ────────
+(function init() {
+  bindAppEvents();
+  const raw   = localStorage.getItem('feedr_v4');
+  const creds = Repo.getCreds();
+  if (raw) {
+    try {
+      const parsed  = JSON.parse(raw);
+      const migrated = MigrationService.run(parsed);
+      Repo.replaceAll(migrated);
+    } catch { Repo.replaceAll({ feeds:[] }); }
+  }
+  if (creds.token && creds.gistId) { showHome(); manualSync(); }
+  else { showHome(); }
+})();
+</script>
+</body>
+</html>
