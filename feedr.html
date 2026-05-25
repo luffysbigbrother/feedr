@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Feedr">
@@ -52,6 +52,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .btn-setup-primary{width:100%;padding:15px;border-radius:var(--radius);background:var(--blue);color:#fff;border:none;font-size:17px;font-weight:600;cursor:pointer;margin-bottom:12px;}
 .btn-setup-primary:active{opacity:0.8;}
 .btn-setup-secondary{width:100%;padding:13px;border-radius:var(--radius);background:var(--surface);border:0.5px solid var(--border);color:var(--text2);font-size:15px;cursor:pointer;}
+.btn-disconnect{width:100%;padding:13px;border-radius:var(--radius);background:var(--surface);border:0.5px solid var(--red);color:var(--red);font-size:15px;font-weight:500;cursor:pointer;margin-bottom:10px;display:none;}
+.btn-disconnect.visible{display:block;}
+.disconnect-note{font-size:12px;color:var(--text2);line-height:1.5;padding:0 4px;margin-bottom:8px;display:none;}
+.disconnect-note.visible{display:block;}
 .setup-error{color:var(--red);font-size:14px;text-align:center;min-height:20px;margin-bottom:8px;}
 .setup-step{display:flex;gap:12px;align-items:flex-start;padding:10px 0;}
 .setup-step-num{width:26px;height:26px;border-radius:var(--radius-full);background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
@@ -65,6 +69,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .sync-dot.syncing{background:var(--orange);}
 .sync-dot.error{background:var(--red);}
 .sync-label{color:var(--text2);}
+.no-sync-bar{padding:8px 16px;display:flex;align-items:center;gap:8px;font-size:12px;flex-shrink:0;border-bottom:0.5px solid var(--border);background:rgba(255,149,0,0.08);color:var(--orange);}
+.no-sync-bar span{flex:1;line-height:1.4;}
+.no-sync-bar button{padding:4px 12px;border-radius:var(--radius-full);background:var(--orange);color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 
 .feed-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .feed-card{background:var(--surface);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:6px;cursor:pointer;border:0.5px solid var(--border);transition:opacity 0.15s;position:relative;user-select:none;}
@@ -127,6 +134,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .btn-remove{width:30px;height:30px;border-radius:var(--radius-full);background:rgba(255,59,48,0.12);border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-remove svg{width:14px;height:14px;}
 .no-results{padding:32px 16px;text-align:center;color:var(--text2);font-size:15px;}
+.acct-display-name{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.acct-username-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
+.acct-username-sub{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.acct-username-only{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn-edit-acct{width:30px;height:30px;border-radius:var(--radius-full);background:var(--surface2);border:0.5px solid var(--border);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.btn-edit-acct svg{width:14px;height:14px;}
+.display-name-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.display-name-row input{flex:1;padding:10px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;outline:none;}
+.display-name-row input:focus{border-color:var(--blue);}
 
 .sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center;}
 .sheet-backdrop.open{display:flex;}
@@ -137,6 +153,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .field label{font-size:13px;color:var(--text2);font-weight:500;}
 .field input{padding:12px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;outline:none;width:100%;}
 .field input:focus{border-color:var(--blue);}
+.field input.field-empty{border-color:var(--orange);background:rgba(255,149,0,0.06);}
+.field-warning{font-size:12px;color:var(--orange);margin-top:4px;display:none;}
+.field-warning.visible{display:block;}
 .sheet-actions{display:flex;gap:10px;}
 .btn-sheet-cancel{flex:1;padding:13px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;}
 .btn-sheet-save{flex:2;padding:13px;border-radius:var(--radius-sm);background:var(--blue);color:#fff;border:none;font-size:16px;font-weight:600;cursor:pointer;}
@@ -210,6 +229,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <span class="sync-label" id="sync-label">Synced</span>
     </div>
     <div class="reorder-bar" id="reorder-bar">Drag cards to reorder — tap Done when finished</div>
+    <div class="no-sync-bar" id="no-sync-bar" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>GitHub sync not connected — feeds saved on this device only.</span>
+      <button id="btn-no-sync-setup">Connect</button>
+    </div>
     <div class="scroll" id="home-scroll"></div>
     <div class="fab-wrap">
       <button class="fab" id="btn-new-feed">
@@ -255,11 +279,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="setup-wrap">
       <div class="setup-section-label">GitHub sync</div>
       <div class="setup-card">
-        <div class="setup-row"><div class="setup-row-label">Personal Access Token</div><input id="settings-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocorrect="off" autocapitalize="none" spellcheck="false"/></div>
-        <div class="setup-row"><div class="setup-row-label">Gist ID</div><input id="settings-gist" type="text" placeholder="abc123def456" autocorrect="off" autocapitalize="none" spellcheck="false"/></div>
+        <div class="setup-row"><div class="setup-row-label">Personal Access Token</div><input id="settings-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocorrect="off" autocapitalize="none" spellcheck="false"/><div class="field-warning" id="settings-token-warning">Token is required to enable sync</div></div>
+        <div class="setup-row"><div class="setup-row-label">Gist ID</div><input id="settings-gist" type="text" placeholder="abc123def456" autocorrect="off" autocapitalize="none" spellcheck="false"/><div class="field-warning" id="settings-gist-warning">Gist ID is required to enable sync</div></div>
       </div>
       <div class="setup-error" id="settings-error"></div>
       <button class="btn-setup-primary" id="btn-save-settings">Save & Reconnect</button>
+      <button class="btn-disconnect" id="btn-disconnect">Disconnect this device</button>
+      <div class="disconnect-note" id="disconnect-note">Removes your token and feeds from this device only. Your GitHub Gist data is untouched — reconnect any time with your token and Gist ID to restore everything.</div>
       <div class="setup-section-label" style="margin-top:24px;">Data</div>
       <div class="setup-card">
         <div class="setup-row" style="flex-direction:row;justify-content:space-between;align-items:center;"><div style="font-size:15px;color:var(--text);">Export feeds as JSON</div><button class="nav-btn" id="btn-export">Export</button></div>
@@ -294,6 +320,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <button class="btn-sheet-save" id="btn-save-edit">Save Changes</button>
       </div>
       <button class="btn-sheet-delete" id="btn-delete-feed">Delete Feed</button>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="sheet-edit-account">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Edit account</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:-8px;" id="edit-acct-username"></div>
+      <div class="field">
+        <label for="inp-edit-acct-name">Display name</label>
+        <input id="inp-edit-acct-name" placeholder="e.g. BAMIDELE — leave blank to show username" maxlength="50" autocorrect="off" spellcheck="false"/>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-sheet-cancel" id="btn-cancel-edit-acct">Cancel</button>
+        <button class="btn-sheet-save" id="btn-save-edit-acct">Save</button>
+      </div>
     </div>
   </div>
 
@@ -435,14 +477,15 @@ const AccountResolver = {
 
 // ── Fix 11: AppState — single owner of all mutable UI state ──────────────
 const AppState = {
-  currentFeedId:    null,
-  searchQuery:      '',
-  reorderMode:      false,
-  dragSrcId:        null,
-  syncTimer:        null,
-  detectedPlatform: null,
-  manualPlatform:   null,
-  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; },
+  currentFeedId:      null,
+  searchQuery:        '',
+  reorderMode:        false,
+  dragSrcId:          null,
+  syncTimer:          null,
+  detectedPlatform:   null,
+  manualPlatform:     null,
+  editingAccountId:   null,
+  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; this.editingAccountId=null; },
   resetAddBar() { this.detectedPlatform=null; this.manualPlatform=null; }
 };
 
@@ -524,10 +567,17 @@ function feedPlatformSummary(accounts) {
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 function showHome() {
-  const creds = Repo.getCreds();
+  const creds   = Repo.getCreds();
   const syncBar = document.getElementById('sync-bar');
-  syncBar.style.display = creds.token ? 'flex' : 'none';
-  if (creds.token) setSyncStatus('ok','Synced');
+  const noSync  = document.getElementById('no-sync-bar');
+  if (creds.token && creds.gistId) {
+    syncBar.style.display = 'flex';
+    noSync.style.display  = 'none';
+    setSyncStatus('ok','Synced');
+  } else {
+    syncBar.style.display = 'none';
+    noSync.style.display  = 'flex';
+  }
   if (AppState.reorderMode) {
     AppState.reorderMode = false;
     document.getElementById('btn-reorder').textContent = 'Reorder';
@@ -636,6 +686,9 @@ function renderAddBar() {
       <span id="detect-label">${AppState.detectedPlatform ? `${PLATFORMS[AppState.detectedPlatform.platform].label} detected · @${esc(AppState.detectedPlatform.username)}` : ''}</span>
     </div>
     <div class="platform-picker" id="platform-picker">${ppBtns}</div>
+    <div class="display-name-row" id="display-name-row" style="display:none;">
+      <input id="inp-display-name" type="text" placeholder="Display name — optional e.g. BAMIDELE" maxlength="50" autocorrect="off" spellcheck="false"/>
+    </div>
   </div>`;
 }
 
@@ -643,20 +696,33 @@ function renderAccountList(accounts, totalCount) {
   if (!accounts.length) {
     return `<div class="no-results">No accounts match your search</div>`;
   }
-  const rows = accounts.map(a => `
+  const rows = accounts.map(a => {
+    const hasName = a.displayName && a.displayName.trim();
+    const nameHTML = hasName
+      ? `<div class="acct-display-name">${esc(a.displayName)}</div>
+         <div class="acct-username-line">
+           <span class="acct-username-sub">@${esc(a.username)}</span>
+           ${platformPillHTML(a.platform)}
+         </div>`
+      : `<div class="acct-username-line">
+           <span class="acct-username-only">@${esc(a.username)}</span>
+           ${platformPillHTML(a.platform)}
+         </div>`;
+    return `
     <div class="account-row" data-account-id="${esc(a.id)}">
-      <div class="avatar" style="background:${avatarColor(a.username)}">${initials(a.username)}</div>
-      <div class="account-info">
-        <div class="account-username">@${esc(a.username)}</div>
-        ${platformPillHTML(a.platform)}
-      </div>
+      <div class="avatar" style="background:${avatarColor(a.username)}">${hasName ? esc(a.displayName).slice(0,2).toUpperCase() : initials(a.username)}</div>
+      <div class="account-info">${nameHTML}</div>
       <div class="account-row-actions">
         <button class="btn-open" data-platform="${esc(a.platform)}" data-username="${esc(a.username)}">Open</button>
+        <button class="btn-edit-acct" data-account-id="${esc(a.id)}" aria-label="Edit ${esc(a.username)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button class="btn-remove" data-account-id="${esc(a.id)}" aria-label="Remove @${esc(a.username)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount!==1?'s':''}</div><div class="account-list">${rows}</div>`;
 }
 
@@ -671,7 +737,7 @@ function renderFeed() {
 
   document.getElementById('feed-nav-title').textContent = esc(feed.name);
   const q        = AppState.searchQuery.toLowerCase();
-  const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)) : feed.accounts;
+  const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)||((a.displayName||'').toLowerCase().includes(q))) : feed.accounts;
   const el       = document.getElementById('feed-scroll');
 
   const currentInputVal = document.getElementById('inp-add-account')?.value || '';
@@ -723,8 +789,10 @@ function bindFeedEvents() {
     list.addEventListener('click', e => {
       const openBtn   = e.target.closest('.btn-open');
       const removeBtn = e.target.closest('.btn-remove');
+      const editBtn   = e.target.closest('.btn-edit-acct');
       if (openBtn)   openProfile(openBtn.dataset.platform, openBtn.dataset.username);
       if (removeBtn) removeAccount(removeBtn.dataset.accountId);
+      if (editBtn)   openEditAccountSheet(editBtn.dataset.accountId);
     });
   }
 }
@@ -766,6 +834,8 @@ function onAddInput() {
       strip.classList.add('visible');
       picker.classList.remove('visible');
       inp.classList.add('detected');
+      const dnRow = document.getElementById('display-name-row');
+      if (dnRow) dnRow.style.display = 'flex';
     } else {
       strip.classList.remove('visible');
       picker.classList.remove('visible');
@@ -775,6 +845,8 @@ function onAddInput() {
     strip.classList.remove('visible');
     picker.classList.add('visible');
     inp.classList.remove('detected');
+    const dnRow = document.getElementById('display-name-row');
+    if (dnRow) dnRow.style.display = 'flex';
   }
 }
 
@@ -792,6 +864,8 @@ function selectManualPlatform(platform) {
     btn.style.borderColor  = sel ? (dark ? p.darkColor : p.color) : 'var(--border)';
     btn.classList.toggle('selected', sel);
   });
+  const dnRow = document.getElementById('display-name-row');
+  if (dnRow) dnRow.style.display = 'flex';
   document.getElementById('inp-add-account')?.focus();
 }
 
@@ -812,9 +886,12 @@ function addAccount() {
     toast('Already in this feed'); inp.value=''; return;
   }
 
-  feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, addedAt:Date.now() });
+  const dnInp = document.getElementById('inp-display-name');
+  const displayName = dnInp ? dnInp.value.trim() : '';
+  feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, displayName, addedAt:Date.now() });
   Repo.saveFeed(feed);
   inp.value='';
+  if (dnInp) dnInp.value='';
   AppState.resetAddBar();
   scheduleSyncToGist();
   renderFeed();
@@ -832,11 +909,46 @@ function removeAccount(accountId) {
   if (acct) toast(`@${acct.username} removed`);
 }
 
-// ── Fix 8: openProfile has graceful fallback for unknown platform ─────────
+// ── Fix 8 + Bug 1: graceful fallback + silent anchor avoids blank PWA overlay
 function openProfile(platform, username) {
   const p = PLATFORMS[platform];
   if (!p) { toast(`Unknown platform: ${platform}`); return; }
-  window.open(p.profileUrl(username), '_blank');
+  const url = p.profileUrl(username);
+  // Using a programmatically clicked anchor prevents the blank white screen
+  // that window.open causes when Feedr is running as a PWA on iOS
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── Edit Account (display name) ────────────────────────────────────────────
+function openEditAccountSheet(accountId) {
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed) return;
+  const acct = feed.accounts.find(a => a.id === accountId);
+  if (!acct) return;
+  AppState.editingAccountId = accountId;
+  document.getElementById('inp-edit-acct-name').value = acct.displayName || '';
+  document.getElementById('edit-acct-username').textContent = `@${acct.username} · ${PLATFORMS[acct.platform]?.label || acct.platform}`;
+  openSheet('sheet-edit-account');
+}
+
+function saveAccountEdit() {
+  const feed = Repo.getFeed(AppState.currentFeedId);
+  if (!feed || !AppState.editingAccountId) return;
+  const acct = feed.accounts.find(a => a.id === AppState.editingAccountId);
+  if (!acct) return;
+  acct.displayName = document.getElementById('inp-edit-acct-name').value.trim();
+  Repo.saveFeed(feed);
+  AppState.editingAccountId = null;
+  closeSheet('sheet-edit-account');
+  scheduleSyncToGist();
+  renderFeed();
+  toast('Account updated');
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────
@@ -886,10 +998,23 @@ function deleteFeed() {
 
 // ── Settings ───────────────────────────────────────────────────────────────
 function openSettings() {
-  const creds = Repo.getCreds();
-  document.getElementById('settings-token').value = creds.token  || '';
-  document.getElementById('settings-gist').value  = creds.gistId || '';
+  const creds      = Repo.getCreds();
+  const tokenInp   = document.getElementById('settings-token');
+  const gistInp    = document.getElementById('settings-gist');
+  const tokenWarn  = document.getElementById('settings-token-warning');
+  const gistWarn   = document.getElementById('settings-gist-warning');
+  tokenInp.value   = creds.token  || '';
+  gistInp.value    = creds.gistId || '';
   document.getElementById('settings-error').textContent = '';
+  // Highlight empty fields so user immediately sees what is missing
+  tokenInp.classList.toggle('field-empty', !creds.token);
+  gistInp.classList.toggle('field-empty',  !creds.gistId);
+  if (tokenWarn) tokenWarn.classList.toggle('visible', !creds.token);
+  if (gistWarn)  gistWarn.classList.toggle('visible',  !creds.gistId);
+  // Only show disconnect when credentials are actually saved
+  const hasCredentials = !!(creds.token && creds.gistId);
+  document.getElementById('btn-disconnect').classList.toggle('visible', hasCredentials);
+  document.getElementById('disconnect-note').classList.toggle('visible', hasCredentials);
   showScreen('screen-settings');
 }
 
@@ -947,6 +1072,14 @@ function resetApp() {
   showScreen('screen-setup');
 }
 
+// ── Disconnect — clears device credentials and local data, Gist untouched ─
+function disconnectDevice() {
+  if (!confirm('This will remove your token and all feed data from this device. Your GitHub Gist is untouched — reconnect any time with your token and Gist ID to restore everything. Continue?')) return;
+  Repo.clearAll();
+  showScreen('screen-setup');
+  toast('Device disconnected — your Gist data is safe');
+}
+
 // ── Setup ──────────────────────────────────────────────────────────────────
 async function connectGist() {
   const token  = document.getElementById('inp-token').value.trim();
@@ -981,6 +1114,7 @@ function bindAppEvents() {
   // Setup screen
   document.getElementById('btn-connect').addEventListener('click', connectGist);
   document.getElementById('btn-local').addEventListener('click', useLocalOnly);
+  document.getElementById('btn-no-sync-setup').addEventListener('click', openSettings);
 
   // Home screen
   document.getElementById('btn-reorder').addEventListener('click', toggleReorder);
@@ -1001,6 +1135,7 @@ function bindAppEvents() {
   document.getElementById('btn-import-trigger').addEventListener('click', () => document.getElementById('import-file').click());
   document.getElementById('import-file').addEventListener('change', importData);
   document.getElementById('btn-reset').addEventListener('click', resetApp);
+  document.getElementById('btn-disconnect').addEventListener('click', disconnectDevice);
 
   // Create sheet
   document.getElementById('btn-cancel-create').addEventListener('click', () => closeSheet('sheet-create'));
@@ -1013,27 +1148,45 @@ function bindAppEvents() {
   document.getElementById('btn-delete-feed').addEventListener('click', deleteFeed);
   document.getElementById('inp-edit-name').addEventListener('keydown', e => { if(e.key==='Enter') updateFeed(); });
 
+  // Edit account sheet
+  document.getElementById('btn-cancel-edit-acct').addEventListener('click', () => closeSheet('sheet-edit-account'));
+  document.getElementById('btn-save-edit-acct').addEventListener('click', saveAccountEdit);
+  document.getElementById('inp-edit-acct-name').addEventListener('keydown', e => { if(e.key==='Enter') saveAccountEdit(); });
+
   // Sheet backdrop dismiss
   document.querySelectorAll('.sheet-backdrop').forEach(b => b.addEventListener('click', e => { if(e.target===b) b.classList.remove('open'); }));
 
   // Keyboard
   document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.sheet-backdrop.open').forEach(s=>s.classList.remove('open')); });
+
+// Bug 2 fix: reset scroll and zoom when PWA is reopened from Home Screen
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    window.scrollTo(0, 0);
+    document.documentElement.style.zoom = '1';
+  }
+});
 }
 
-// ── Fix 2 & 3: Init — migration once, local-only correctly handled ────────
+// ── Init — routes to setup when no credentials exist, home when they do ───
 (function init() {
   bindAppEvents();
   const raw   = localStorage.getItem('feedr_v4');
   const creds = Repo.getCreds();
   if (raw) {
     try {
-      const parsed  = JSON.parse(raw);
+      const parsed   = JSON.parse(raw);
       const migrated = MigrationService.run(parsed);
       Repo.replaceAll(migrated);
     } catch { Repo.replaceAll({ feeds:[] }); }
   }
-  if (creds.token && creds.gistId) { showHome(); manualSync(); }
-  else { showHome(); }
+  if (creds.token && creds.gistId) {
+    showHome();
+    manualSync();
+  } else {
+    // No credentials saved — always show setup so user is never silently unconnected
+    showScreen('screen-setup');
+  }
 })();
 </script>
 </body>
