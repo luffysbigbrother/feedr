@@ -133,6 +133,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .btn-open{padding:6px 14px;border-radius:var(--radius-full);background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-remove{width:30px;height:30px;border-radius:var(--radius-full);background:rgba(255,59,48,0.12);border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-remove svg{width:14px;height:14px;}
+.city-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;background:transparent;border:1px solid var(--border);color:var(--text2);}
+.city-pill svg{width:10px;height:10px;flex-shrink:0;}
+.acct-no-city{font-size:11px;color:var(--text3);font-style:italic;}
 .no-results{padding:32px 16px;text-align:center;color:var(--text2);font-size:15px;}
 .acct-display-name{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .acct-username-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
@@ -391,10 +394,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <label for="inp-edit-acct-name">Display name</label>
         <input id="inp-edit-acct-name" placeholder="e.g. FRED HAMPTON — leave blank to show username" maxlength="50" autocorrect="off" spellcheck="false"/>
       </div>
+      <div class="field">
+        <label for="inp-edit-acct-city">City</label>
+        <input id="inp-edit-acct-city" placeholder="e.g. Atlanta, GA or Accra, Ghana" maxlength="60" autocorrect="off" spellcheck="false"/>
+      </div>
       <div class="sheet-actions">
         <button class="btn-sheet-cancel" id="btn-cancel-edit-acct">Cancel</button>
         <button class="btn-sheet-save" id="btn-save-edit-acct">Save</button>
       </div>
+      <button class="btn-sheet-delete" id="btn-remove-account">Remove account</button>
     </div>
   </div>
 
@@ -453,7 +461,7 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 // Format: YYYY.MM.DD.n (year.month.day.build)
 // Never change STORAGE_KEY — change APP_VERSION instead.
 // MigrationService runs automatically when version in storage differs from this.
-const APP_VERSION  = '2026.05.25.2';
+const APP_VERSION  = '2026.05.25.3';
 const VERSION_KEY  = 'feedr_appversion';
 
 // ── Platform Registry (Open/Closed — extend here only) ────────────────────
@@ -998,45 +1006,56 @@ function renderAddBar() {
   </div>`;
 }
 
+// ── City pill — outlined style, visually distinct from filled platform pills
+function cityPillHTML(city) {
+  if (!city || !city.trim()) return `<span class="acct-no-city">no city set</span>`;
+  return `<span class="city-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(city)}</span>`;
+}
+
 function renderAccountList(accounts, totalCount) {
   if (!accounts.length) {
     return `<div class="no-results">No accounts match your search</div>`;
   }
-  let sorted = AppState.feedSortAZ ? [...accounts].sort((a,b)=>(a.displayName||a.username).localeCompare(b.displayName||b.username)) : accounts;
+  let sorted = AppState.feedSortAZ
+    ? [...accounts].sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username))
+    : accounts;
   const reorder = AppState.feedReorderMode;
+
   const rows = sorted.map(a => {
-    const hasName = a.displayName && a.displayName.trim();
+    const hasName  = a.displayName && a.displayName.trim();
+    const avatarTx = hasName ? esc(a.displayName).slice(0, 2).toUpperCase() : initials(a.username);
     const nameHTML = hasName
       ? `<div class="acct-display-name">${esc(a.displayName)}</div>
          <div class="acct-username-line">
            <span class="acct-username-sub">@${esc(a.username)}</span>
            ${platformPillHTML(a.platform)}
+           ${cityPillHTML(a.city)}
          </div>`
       : `<div class="acct-username-line">
            <span class="acct-username-only">@${esc(a.username)}</span>
            ${platformPillHTML(a.platform)}
+           ${cityPillHTML(a.city)}
          </div>`;
     return `
-    <div class="account-row${reorder?' draggable-acct':''}" data-account-id="${esc(a.id)}">
+    <div class="account-row" data-account-id="${esc(a.id)}">
       <div class="acct-drag-handle" data-account-id="${esc(a.id)}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       </div>
-      <div class="avatar" style="background:${avatarColor(a.username)}">${hasName ? esc(a.displayName).slice(0,2).toUpperCase() : initials(a.username)}</div>
+      <div class="avatar" style="background:${avatarColor(a.username)}">${avatarTx}</div>
       <div class="account-info">${nameHTML}</div>
       <div class="account-row-actions">
         <button class="btn-open" data-platform="${esc(a.platform)}" data-username="${esc(a.username)}">Open</button>
         <button class="btn-edit-acct" data-account-id="${esc(a.id)}" aria-label="Edit ${esc(a.username)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="btn-remove" data-account-id="${esc(a.id)}" aria-label="Remove @${esc(a.username)}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
     </div>`;
   }).join('');
-  const listClass = `account-list${reorder?' feed-reorder-mode':''}`;
-  return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount!==1?'s':''}</div><div class="${listClass}">${rows}</div>`;
+
+  const listClass = `account-list${reorder ? ' feed-reorder-mode' : ''}`;
+  return `<div class="section-header">${accounts.length} of ${totalCount} account${totalCount !== 1 ? 's' : ''}</div><div class="${listClass}">${rows}</div>`;
 }
+
 
 function renderEmptyFeed() {
   return `<div class="empty" style="padding-top:16px;"><div class="empty-title">No accounts yet</div><div class="empty-sub">Paste a profile link from Instagram, TikTok, X, Threads, or YouTube — or type a username and choose a platform</div></div>`;
@@ -1067,7 +1086,7 @@ function renderFeed() {
   const feedReorderBar = document.getElementById('feed-reorder-bar');
   if (feedReorderBar) feedReorderBar.classList.toggle('visible', AppState.feedReorderMode);
   const q        = AppState.searchQuery.toLowerCase();
-  const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)||((a.displayName||'').toLowerCase().includes(q))) : feed.accounts;
+  const filtered = q ? feed.accounts.filter(a=>a.username.includes(q)||(a.platform||'').includes(q)||((a.displayName||'').toLowerCase().includes(q))||((a.city||'').toLowerCase().includes(q))) : feed.accounts;
   const el       = document.getElementById('feed-scroll');
 
   const currentInputVal = document.getElementById('inp-add-account')?.value || '';
@@ -1118,11 +1137,9 @@ function bindFeedEvents() {
   if (list) {
     list.addEventListener('click', e => {
       const openBtn   = e.target.closest('.btn-open');
-      const removeBtn = e.target.closest('.btn-remove');
       const editBtn   = e.target.closest('.btn-edit-acct');
-      if (openBtn)   openProfile(openBtn.dataset.platform, openBtn.dataset.username);
-      if (removeBtn) removeAccount(removeBtn.dataset.accountId);
-      if (editBtn)   openEditAccountSheet(editBtn.dataset.accountId);
+      if (openBtn)  openProfile(openBtn.dataset.platform, openBtn.dataset.username);
+      if (editBtn)  openEditAccountSheet(editBtn.dataset.accountId);
     });
     list.querySelectorAll('.acct-drag-handle').forEach(handle => {
       const row = handle.closest('.account-row');
@@ -1246,6 +1263,14 @@ function removeAccount(accountId) {
   if (acct) toast(`@${acct.username} removed`);
 }
 
+function removeAccountFromEdit() {
+  const id = AppState.editingAccountId;
+  if (!id) return;
+  closeSheet('sheet-edit-account');
+  AppState.editingAccountId = null;
+  removeAccount(id);
+}
+
 // ── Fix 8 + Bug 1: graceful fallback + silent anchor avoids blank PWA overlay
 function openProfile(platform, username) {
   const p = PLATFORMS[platform];
@@ -1270,6 +1295,7 @@ function openEditAccountSheet(accountId) {
   if (!acct) return;
   AppState.editingAccountId = accountId;
   document.getElementById('inp-edit-acct-name').value = acct.displayName || '';
+  document.getElementById('inp-edit-acct-city').value = acct.city || '';
   document.getElementById('edit-acct-username').textContent = `@${acct.username} · ${PLATFORMS[acct.platform]?.label || acct.platform}`;
   openSheet('sheet-edit-account');
 }
@@ -1679,7 +1705,9 @@ function bindAppEvents() {
   // Edit account sheet
   document.getElementById('btn-cancel-edit-acct').addEventListener('click', () => closeSheet('sheet-edit-account'));
   document.getElementById('btn-save-edit-acct').addEventListener('click', saveAccountEdit);
+  document.getElementById('btn-remove-account').addEventListener('click', removeAccountFromEdit);
   document.getElementById('inp-edit-acct-name').addEventListener('keydown', e => { if(e.key==='Enter') saveAccountEdit(); });
+  document.getElementById('inp-edit-acct-city').addEventListener('keydown', e => { if(e.key==='Enter') saveAccountEdit(); });
 
   // Sheet backdrop dismiss
   document.querySelectorAll('.sheet-backdrop').forEach(b => b.addEventListener('click', e => { if(e.target===b) b.classList.remove('open'); }));
