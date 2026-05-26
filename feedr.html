@@ -453,7 +453,7 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 // Format: YYYY.MM.DD.n (year.month.day.build)
 // Never change STORAGE_KEY — change APP_VERSION instead.
 // MigrationService runs automatically when version in storage differs from this.
-const APP_VERSION  = '2026.05.25.1';
+const APP_VERSION  = '2026.05.25.2';
 const VERSION_KEY  = 'feedr_appversion';
 
 // ── Platform Registry (Open/Closed — extend here only) ────────────────────
@@ -461,7 +461,7 @@ const PLATFORMS = {
   instagram: { label:'Instagram', color:'#c2185b', bg:'#fce4ec', darkColor:'#f48fb1', darkBg:'#4a0d25', profileUrl:(u)=>`https://www.instagram.com/${u}/`,   domains:['instagram.com'] },
   tiktok:    { label:'TikTok',    color:'#311b92', bg:'#ede7f6', darkColor:'#b39ddb', darkBg:'#1a0a3d', profileUrl:(u)=>`https://www.tiktok.com/@${u}`,       domains:['tiktok.com','vm.tiktok.com','vt.tiktok.com'] },
   x:         { label:'X',         color:'#0d47a1', bg:'#e3f2fd', darkColor:'#90caf9', darkBg:'#0a2540', profileUrl:(u)=>`https://www.x.com/${u}`,              domains:['x.com','twitter.com'] },
-  threads:   { label:'Threads',   color:'#1b5e20', bg:'#e8f5e9', darkColor:'#a5d6a7', darkBg:'#0a2e0d', profileUrl:(u)=>`https://www.threads.net/@${u}`,       domains:['threads.net'] },
+  threads:   { label:'Threads',   color:'#1b5e20', bg:'#e8f5e9', darkColor:'#a5d6a7', darkBg:'#0a2e0d', profileUrl:(u)=>`https://www.threads.com/@${u}`,       domains:['threads.com','threads.net','www.threads.com','www.threads.net'] },
   youtube:   { label:'YouTube',   color:'#b71c1c', bg:'#ffebee', darkColor:'#ef9a9a', darkBg:'#3d0a0a', profileUrl:(u)=>u.startsWith('UC')?`https://www.youtube.com/channel/${u}`:`https://www.youtube.com/@${u}`, domains:['youtube.com','youtu.be','m.youtube.com'] }
 };
 const PLATFORM_KEYS = Object.keys(PLATFORMS);
@@ -477,7 +477,7 @@ const UrlDetector = ((platformKeys) => {
     instagram: (p) => { const m=p.match(/^instagram\.com\/([a-z0-9._]+)\/?/i); return m&&!['p','reel','reels','stories','explore','tv'].includes(m[1])?m[1]:null; },
     tiktok:    (p) => { const m=p.match(/^(?:(?:www\.|vm\.|vt\.)?tiktok\.com)\/@([a-z0-9._]+)/i); return m?m[1]:null; },
     x:         (p) => { const m=p.match(/^(?:(?:www\.)?(?:x|twitter)\.com)\/([a-z0-9_]+)\/?/i); return m&&!['home','explore','notifications','messages','i','search'].includes(m[1])?m[1]:null; },
-    threads:   (p) => { const m=p.match(/^(?:www\.)?threads\.net\/@([a-z0-9._]+)/i); return m?m[1]:null; },
+    threads:   (p) => { const m=p.match(/^(?:www\.)?threads\.(?:com|net)\/@([a-z0-9._]+)/i); return m?m[1]:null; },
     youtube:   (p) => {
       let m;
       if((m=p.match(/^(?:www\.)?youtube\.com\/@([a-z0-9._-]+)/i))) return m[1];
