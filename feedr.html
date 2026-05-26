@@ -281,7 +281,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div class="sync-dot ok" id="sync-dot"></div>
       <span class="sync-label" id="sync-label">Synced</span>
     </div>
-    <div class="reorder-bar" id="reorder-bar">Drag cards to reorder — tap Done when finished</div>
+    <div class="reorder-bar" id="reorder-bar">Press and drag cards to reorder — tap the reorder icon when finished</div>
     <div class="no-sync-bar" id="no-sync-bar" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span>GitHub sync not connected — feeds saved on this device only.</span>
@@ -315,7 +315,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         </button>
       </div>
     </div>
-    <div class="feed-reorder-bar" id="feed-reorder-bar">Drag accounts to reorder — tap Done when finished</div>
+    <div class="feed-reorder-bar" id="feed-reorder-bar">Press and drag accounts to reorder — tap Reorder when finished</div>
     <div class="search-wrap">
       <div class="search-inner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -629,24 +629,33 @@ const AccountResolver = {
 
 // ── Fix 11: AppState — single owner of all mutable UI state ──────────────
 const AppState = {
-  currentFeedId:      null,
-  searchQuery:        '',
-  reorderMode:        false,
-  feedReorderMode:    false,
-  feedSortAZ:         false,
-  homeSortAZ:         false,
-  dragSrcId:          null,
-  dragSrcAcctId:      null,
-  syncTimer:          null,
-  detectedPlatform:   null,
-  manualPlatform:     null,
-  editingAccountId:   null,
-  hiddenVisible:      false,
-  pinBuffer:          '',
-  pinTapCount:        0,
-  pinTapTimer:        null,
-  reset() { this.currentFeedId=null; this.searchQuery=''; this.detectedPlatform=null; this.manualPlatform=null; this.editingAccountId=null; this.feedReorderMode=false; this.feedSortAZ=false; },
-  resetAddBar() { this.detectedPlatform=null; this.manualPlatform=null; }
+  currentFeedId:        null,
+  currentFeedHidden:    false,
+  searchQuery:          '',
+  reorderMode:          false,
+  feedReorderMode:      false,
+  feedSortAZ:           false,
+  homeSortAZ:           false,
+  syncTimer:            null,
+  detectedPlatform:     null,
+  manualPlatform:       null,
+  editingAccountId:     null,
+  hiddenVisible:        false,
+  pinBuffer:            '',
+  pinTapCount:          0,
+  pinTapTimer:          null,
+  pendingHideFeedId:    null,   // feed awaiting PIN setup before hide completes
+  reset() {
+    this.currentFeedId     = null;
+    this.currentFeedHidden = false;
+    this.searchQuery       = '';
+    this.detectedPlatform  = null;
+    this.manualPlatform    = null;
+    this.editingAccountId  = null;
+    this.feedReorderMode   = false;
+    this.feedSortAZ        = false;
+  },
+  resetAddBar() { this.detectedPlatform = null; this.manualPlatform = null; }
 };
 
 // ── Utilities ──────────────────────────────────────────────────────────────
@@ -751,60 +760,62 @@ function showHome() {
 function goHome() { showHome(); }
 
 // ── Home Screen ────────────────────────────────────────────────────────────
-function buildFeedCard(f, draggable, isHidden=false) {
-  const card = document.createElement('div');
-  card.className = 'feed-card';
-  card.id = `card-${f.id}`;
-  card.draggable = draggable;
-  card.dataset.hidden = isHidden ? '1' : '0';
-  card.innerHTML = `
-    <div class="reorder-handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+// ── Feed card HTML builder — pure function, returns HTML string ───────────
+function feedCardHTML(f, reorderMode, isHidden) {
+  const reorderHandle = `<div class="reorder-handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>`;
+  return `<div class="feed-card" id="card-${f.id}" data-hidden="${isHidden?'1':'0'}">
+    ${reorderHandle}
     <div class="feed-name">${esc(f.name)}</div>
     <div class="feed-meta">${f.accounts.length} account${f.accounts.length!==1?'s':''}</div>
-    <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>`;
-  if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(f.id, isHidden));
-  card.addEventListener('touchstart', e => touchDragStart(e, card, f.id, 'feed'), {passive:false});
-  return card;
+    <div class="feed-platforms">${feedPlatformSummary(f.accounts)}</div>
+  </div>`;
 }
 
 function renderHome() {
-  let feeds = Repo.getFeeds();
-  const scrollEl = document.getElementById('home-scroll');
-  document.getElementById('btn-reorder').style.display = feeds.length ? '' : 'none';
+  let feeds       = Repo.getFeeds();
+  const scrollEl  = document.getElementById('home-scroll');
+  const reorderBtn = document.getElementById('btn-reorder');
+  const hasFeeds  = feeds.length > 0;
 
-  if (AppState.homeSortAZ) {
-    feeds = [...feeds].sort((a,b) => a.name.localeCompare(b.name));
-  }
+  reorderBtn.style.display = hasFeeds ? 'flex' : 'none';
 
-  scrollEl.innerHTML = '';
+  if (AppState.homeSortAZ) feeds = [...feeds].sort((a, b) => a.name.localeCompare(b.name));
 
-  if (!feeds.length && !AppState.hiddenVisible) {
+  const hiddenFeeds = AppState.hiddenVisible ? Repo.getHiddenFeeds() : [];
+  const hiddenSorted = AppState.homeSortAZ
+    ? [...hiddenFeeds].sort((a, b) => a.name.localeCompare(b.name))
+    : hiddenFeeds;
+
+  if (!hasFeeds && !hiddenFeeds.length) {
     scrollEl.innerHTML = `<div class="empty"><div class="empty-title">No feeds yet</div><div class="empty-sub">Tap New Feed to create your first category and start organizing the accounts you follow across Instagram, TikTok, X, Threads, and YouTube</div></div>`;
     return;
   }
 
-  if (feeds.length) {
-    const grid = document.createElement('div');
-    grid.className = 'feed-grid' + (AppState.reorderMode ? ' reorder-mode' : '');
-    grid.id = 'feed-grid';
-    feeds.forEach(f => grid.appendChild(buildFeedCard(f, AppState.reorderMode, false)));
-    scrollEl.appendChild(grid);
-  }
+  const visibleGridHTML = hasFeeds
+    ? `<div class="feed-grid${AppState.reorderMode?' reorder-mode':''}" id="feed-grid">
+        ${feeds.map(f => feedCardHTML(f, AppState.reorderMode, false)).join('')}
+       </div>`
+    : '';
 
-  if (AppState.hiddenVisible) {
-    const hiddenFeeds = Repo.getHiddenFeeds();
-    if (hiddenFeeds.length) {
-      let hf = AppState.homeSortAZ ? [...hiddenFeeds].sort((a,b)=>a.name.localeCompare(b.name)) : hiddenFeeds;
-      const header = document.createElement('div');
-      header.className = 'hidden-section-header';
-      header.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Hidden feeds`;
-      scrollEl.appendChild(header);
-      const hGrid = document.createElement('div');
-      hGrid.className = 'feed-grid';
-      hf.forEach(f => hGrid.appendChild(buildFeedCard(f, false, true)));
-      scrollEl.appendChild(hGrid);
-    }
-  }
+  const hiddenGridHTML = hiddenFeeds.length
+    ? `<div class="hidden-section-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Hidden feeds
+       </div>
+       <div class="feed-grid">
+         ${hiddenSorted.map(f => feedCardHTML(f, false, true)).join('')}
+       </div>`
+    : '';
+
+  scrollEl.innerHTML = visibleGridHTML + hiddenGridHTML;
+
+  // Wire touch drag and tap events after DOM is set
+  scrollEl.querySelectorAll('.feed-card').forEach(card => {
+    const fid      = card.id.replace('card-', '');
+    const isHidden = card.dataset.hidden === '1';
+    if (!AppState.reorderMode) card.addEventListener('click', () => openFeed(fid, isHidden));
+    card.addEventListener('touchstart', e => TouchDrag.start(e, card, fid, 'feed'), {passive:false});
+  });
 }
 
 // ── Reorder ────────────────────────────────────────────────────────────────
@@ -817,112 +828,129 @@ function toggleReorder() {
   renderHome();
 }
 
-// ── Touch-based drag-to-reorder (works on iOS Safari) ────────────────────
+// ── Touch-based drag-to-reorder — midpoint detection for accurate iOS drag ─
 const TouchDrag = {
-  el: null, clone: null, srcId: null, type: null,
-  startY: 0, startX: 0, offsetY: 0,
+  el: null, clone: null, srcId: null, type: null, offsetY: 0,
+
+  // Returns the element whose CENTER is closest to (cx, cy)
+  // Much more accurate than elementFromPoint which uses the fingertip only
+  _closestByMidpoint(cx, cy, selector) {
+    const els = [...document.querySelectorAll(selector)];
+    let best = null, bestDist = Infinity;
+    els.forEach(el => {
+      const r = el.getBoundingClientRect();
+      const midX = r.left + r.width  / 2;
+      const midY = r.top  + r.height / 2;
+      const dist = Math.hypot(cx - midX, cy - midY);
+      if (dist < bestDist) { bestDist = dist; best = el; }
+    });
+    return best;
+  },
 
   start(e, el, id, type) {
     if (type === 'feed' && !AppState.reorderMode) return;
     if (type === 'acct' && !AppState.feedReorderMode) return;
     e.preventDefault();
-    this.el   = el;
+    this.el    = el;
     this.srcId = id;
     this.type  = type;
     const touch = e.touches[0];
     const rect  = el.getBoundingClientRect();
-    this.startY  = touch.clientY;
-    this.startX  = touch.clientX;
     this.offsetY = touch.clientY - rect.top;
-
     this.clone = el.cloneNode(true);
-    this.clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:0.85;z-index:999;pointer-events:none;border-radius:13px;box-shadow:0 4px 20px rgba(0,0,0,0.2);`;
+    this.clone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:0.88;z-index:999;pointer-events:none;border-radius:13px;box-shadow:0 6px 24px rgba(0,0,0,0.18);transition:none;`;
     document.body.appendChild(this.clone);
-    el.style.opacity = '0.3';
+    el.style.opacity = '0.25';
   },
 
   move(e) {
     if (!this.clone) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const rect  = this.el.getBoundingClientRect();
     this.clone.style.top = `${touch.clientY - this.offsetY}px`;
 
-    // Find element under finger
-    this.clone.style.display = 'none';
-    const under = document.elementFromPoint(touch.clientX, touch.clientY);
-    this.clone.style.display = '';
+    const selector = this.type === 'feed' ? '.feed-card' : '.account-row';
+    const target   = this._closestByMidpoint(touch.clientX, touch.clientY, selector);
+    const srcAttr  = this.type === 'feed' ? `card-${this.srcId}` : this.srcId;
 
-    const targetCard = this.type === 'feed'
-      ? under?.closest('.feed-card')
-      : under?.closest('.account-row');
+    document.querySelectorAll(selector).forEach(el => {
+      el.classList.remove('drag-over', 'drag-over-acct');
+    });
 
-    if (this.type === 'feed') {
-      document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over'));
-      if (targetCard && targetCard.id !== `card-${this.srcId}`) targetCard.classList.add('drag-over');
-    } else {
-      document.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
-      if (targetCard && targetCard.dataset.accountId !== this.srcId) targetCard.classList.add('drag-over-acct');
+    if (target) {
+      const targetId = this.type === 'feed'
+        ? target.id
+        : target.dataset.accountId;
+      const isSelf = this.type === 'feed'
+        ? targetId === `card-${this.srcId}`
+        : targetId === this.srcId;
+      if (!isSelf) {
+        target.classList.add(this.type === 'feed' ? 'drag-over' : 'drag-over-acct');
+      }
     }
   },
 
   end(e) {
     if (!this.clone) return;
-    const touch = e.changedTouches[0];
+    const touch    = e.changedTouches[0];
+    const type     = this.type;       // capture before nulling
+    const srcId    = this.srcId;
 
-    this.clone.style.display = 'none';
-    const under = document.elementFromPoint(touch.clientX, touch.clientY);
-    this.clone.style.display = '';
+    const selector = type === 'feed' ? '.feed-card' : '.account-row';
+    const target   = this._closestByMidpoint(touch.clientX, touch.clientY, selector);
 
-    if (this.type === 'feed') {
-      const targetCard = under?.closest('.feed-card');
-      const targetId   = targetCard?.id?.replace('card-','');
-      document.querySelectorAll('.feed-card').forEach(c=>c.classList.remove('drag-over'));
-      if (targetId && targetId !== this.srcId) {
-        const ids = Repo.getFeeds().map(f=>f.id);
-        const fi=ids.indexOf(this.srcId), ti=ids.indexOf(targetId);
-        if (fi>=0 && ti>=0) { ids.splice(fi,1); ids.splice(ti,0,this.srcId); Repo.reorder(ids); scheduleSyncToGist(); }
+    document.querySelectorAll(selector).forEach(el => {
+      el.classList.remove('drag-over', 'drag-over-acct');
+    });
+
+    if (target && type === 'feed') {
+      const targetId = target.id?.replace('card-', '');
+      if (targetId && targetId !== srcId) {
+        const ids = Repo.getFeeds().map(f => f.id);
+        const fi = ids.indexOf(srcId), ti = ids.indexOf(targetId);
+        if (fi >= 0 && ti >= 0) {
+          ids.splice(fi, 1);
+          ids.splice(ti, 0, srcId);
+          Repo.reorder(ids);
+          scheduleSyncToGist();
+        }
       }
-    } else {
-      const targetRow = under?.closest('.account-row');
-      const targetId  = targetRow?.dataset?.accountId;
-      document.querySelectorAll('.account-row').forEach(r=>r.classList.remove('drag-over-acct'));
-      if (targetId && targetId !== this.srcId) {
+    } else if (target && type === 'acct') {
+      const targetId = target.dataset?.accountId;
+      if (targetId && targetId !== srcId) {
         const feed = getCurrentFeed();
         if (feed) {
-          const ids = feed.accounts.map(a=>a.id);
-          const fi=ids.indexOf(this.srcId), ti=ids.indexOf(targetId);
-          if (fi>=0 && ti>=0) { const [m]=feed.accounts.splice(fi,1); feed.accounts.splice(ti,0,m); saveCurrentFeed(feed); scheduleSyncToGist(); }
+          const idx = feed.accounts.map(a => a.id);
+          const fi = idx.indexOf(srcId), ti = idx.indexOf(targetId);
+          if (fi >= 0 && ti >= 0) {
+            const [moved] = feed.accounts.splice(fi, 1);
+            feed.accounts.splice(ti, 0, moved);
+            saveCurrentFeed(feed);
+            scheduleSyncToGist();
+          }
         }
       }
     }
 
+    // Clean up before re-render so clone is gone from DOM
     this.el.style.opacity = '';
-    document.body.removeChild(this.clone);
+    try { document.body.removeChild(this.clone); } catch {}
     this.clone = null; this.el = null; this.srcId = null; this.type = null;
 
-    if (this.type === 'feed' || AppState.reorderMode) renderHome();
+    // Re-render the correct screen — use captured type, not this.type (already null)
+    if (type === 'feed') renderHome();
     else renderFeed();
   }
 };
 
-// Re-render after drop
-const _origTouchEnd = TouchDrag.end.bind(TouchDrag);
-TouchDrag.end = function(e) {
-  const type = this.type;
-  _origTouchEnd(e);
-  if (type === 'feed') renderHome();
-  else renderFeed();
-};
 
-function touchDragStart(e, el, id, type) { TouchDrag.start(e, el, id, type); }
 
-document.addEventListener('touchmove',  e => { if (TouchDrag.clone) TouchDrag.move(e); },  {passive:false});
-document.addEventListener('touchend',   e => { if (TouchDrag.clone) TouchDrag.end(e); },   {passive:false});
-document.addEventListener('touchcancel',e => {
-  if (TouchDrag.el)    TouchDrag.el.style.opacity='';
-  if (TouchDrag.clone) { try{document.body.removeChild(TouchDrag.clone);}catch{} }
-  TouchDrag.clone=null; TouchDrag.el=null; TouchDrag.srcId=null; TouchDrag.type=null;
+document.addEventListener('touchmove',   e => { if (TouchDrag.clone) TouchDrag.move(e); },  {passive:false});
+document.addEventListener('touchend',    e => { if (TouchDrag.clone) TouchDrag.end(e); },   {passive:false});
+document.addEventListener('touchcancel', e => {
+  if (TouchDrag.el)    TouchDrag.el.style.opacity = '';
+  if (TouchDrag.clone) { try { document.body.removeChild(TouchDrag.clone); } catch {} }
+  TouchDrag.clone = null; TouchDrag.el = null; TouchDrag.srcId = null; TouchDrag.type = null;
 });
 
 // ── Create Feed ────────────────────────────────────────────────────────────
@@ -1017,13 +1045,18 @@ function renderEmptyFeed() {
 // ── Fix 1 & 12: renderFeed uses sub-renderers, preserves input value ──────
 function getCurrentFeed() {
   return AppState.currentFeedHidden
-    ? Repo.getHiddenFeeds().find(f=>f.id===AppState.currentFeedId) || null
+    ? Repo.getHiddenFeeds().find(f => f.id === AppState.currentFeedId) || null
     : Repo.getFeed(AppState.currentFeedId);
 }
 
 function saveCurrentFeed(feed) {
   if (AppState.currentFeedHidden) Repo.saveHiddenFeed(feed);
   else Repo.saveFeed(feed);
+}
+
+function deleteCurrentFeed() {
+  if (AppState.currentFeedHidden) Repo.deleteHiddenFeed(AppState.currentFeedId);
+  else Repo.deleteFeed(AppState.currentFeedId);
 }
 
 function renderFeed() {
@@ -1093,7 +1126,7 @@ function bindFeedEvents() {
     });
     list.querySelectorAll('.acct-drag-handle').forEach(handle => {
       const row = handle.closest('.account-row');
-      if (row) handle.addEventListener('touchstart', e => touchDragStart(e, row, row.dataset.accountId, 'acct'), {passive:false});
+      if (row) handle.addEventListener('touchstart', e => TouchDrag.start(e, row, row.dataset.accountId, 'acct'), {passive:false});
     });
   }
 }
@@ -1183,7 +1216,7 @@ function addAccount() {
   if (!result) return;
   if (result.error) { toast(result.error); return; }
 
-  const feed = Repo.getFeed(AppState.currentFeedId);
+  const feed = getCurrentFeed();
   if (!feed) return;
 
   if (feed.accounts.some(a=>a.username===result.username && a.platform===result.platform)) {
@@ -1295,12 +1328,27 @@ function updateFeed() {
 function deleteFeed() {
   if (!AppState.currentFeedId) return;
   const feed = getCurrentFeed();
-  if (AppState.currentFeedHidden) Repo.deleteHiddenFeed(AppState.currentFeedId);
-  else Repo.deleteFeed(AppState.currentFeedId);
+  deleteCurrentFeed();
   closeSheet('sheet-edit');
   scheduleSyncToGist();
   goHome();
   toast(`"${feed?.name}" deleted`);
+}
+
+function hideFeed(feed) {
+  Repo.deleteFeed(feed.id);
+  Repo.saveHiddenFeed(feed);
+  scheduleSyncToGist();
+  toast(`"${feed.name}" hidden`);
+  goHome();
+}
+
+function unhideFeed(feed) {
+  Repo.deleteHiddenFeed(feed.id);
+  Repo.saveFeed(feed);
+  scheduleSyncToGist();
+  toast(`"${feed.name}" is now visible`);
+  goHome();
 }
 
 function toggleHideFeed() {
@@ -1308,33 +1356,20 @@ function toggleHideFeed() {
   if (!feed) return;
   closeSheet('sheet-edit');
   if (AppState.currentFeedHidden) {
-    Repo.deleteHiddenFeed(feed.id);
-    Repo.saveFeed(feed);
-    toast(`"${feed.name}" is now visible`);
-    scheduleSyncToGist();
-    goHome();
+    unhideFeed(feed);
+  } else if (!PinService.exists()) {
+    AppState.pendingHideFeedId = feed.id;
+    openSheet('sheet-set-pin');
   } else {
-    if (!PinService.exists()) {
-      AppState._pendingHideFeedId = feed.id;
-      openSheet('sheet-set-pin');
-    } else {
-      Repo.deleteFeed(feed.id);
-      Repo.saveHiddenFeed(feed);
-      scheduleSyncToGist();
-      toast(`"${feed.name}" hidden`);
-      goHome();
-    }
+    hideFeed(feed);
   }
 }
 
+// Called after PIN is first set — feed was waiting for PIN creation to complete
 function completeHideFeed(feedId) {
   const feed = Repo.getFeed(feedId);
   if (!feed) return;
-  Repo.deleteFeed(feedId);
-  Repo.saveHiddenFeed(feed);
-  scheduleSyncToGist();
-  toast(`"${feed.name}" hidden`);
-  goHome();
+  hideFeed(feed);
 }
 
 // ── PIN system ────────────────────────────────────────────────────────────
@@ -1357,9 +1392,16 @@ function updatePinDots(error=false) {
   }
 }
 
+function animatePinError() {
+  updatePinDots(true);
+  const dots = document.getElementById('pin-dots');
+  dots.classList.add('shake');
+  setTimeout(() => { dots.classList.remove('shake'); AppState.pinBuffer = ''; updatePinDots(); }, 450);
+}
+
 function pinKeyPress(key) {
   if (key === 'del') {
-    AppState.pinBuffer = AppState.pinBuffer.slice(0,-1);
+    AppState.pinBuffer = AppState.pinBuffer.slice(0, -1);
     updatePinDots();
     return;
   }
@@ -1373,19 +1415,17 @@ function pinKeyPress(key) {
         AppState.hiddenVisible = true;
         renderHome();
       } else {
-        updatePinDots(true);
-        const dots = document.getElementById('pin-dots');
-        dots.classList.add('shake');
-        setTimeout(() => { dots.classList.remove('shake'); AppState.pinBuffer=''; updatePinDots(); }, 450);
+        animatePinError();
       }
     }, 80);
   }
 }
 
 function forgotPin() {
-  PinService.wipeHidden();
   AppState.hiddenVisible = false;
+  PinService.wipeHidden();
   closePinOverlay();
+  renderHome();
 }
 
 function saveSetPin() {
@@ -1399,9 +1439,9 @@ function saveSetPin() {
   document.getElementById('inp-pin-new').value='';
   document.getElementById('inp-pin-confirm').value='';
   err.textContent='';
-  if (AppState._pendingHideFeedId) {
-    completeHideFeed(AppState._pendingHideFeedId);
-    AppState._pendingHideFeedId = null;
+  if (AppState.pendingHideFeedId) {
+    completeHideFeed(AppState.pendingHideFeedId);
+    AppState.pendingHideFeedId = null;
   }
 }
 
@@ -1425,13 +1465,14 @@ function handleSyncDotTap() {
 // Auto-hide on background
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    AppState.hiddenVisible = false;
+    AppState.hiddenVisible  = false;
+    AppState.feedReorderMode = false;
     closePinOverlay();
   }
   if (document.visibilityState === 'visible') {
     window.scrollTo(0, 0);
     document.documentElement.style.zoom = '1';
-    if (AppState.hiddenVisible) { AppState.hiddenVisible=false; renderHome(); }
+    renderHome();
   }
 });
 
@@ -1609,7 +1650,7 @@ function bindAppEvents() {
   document.getElementById('btn-pin-forgot').addEventListener('click', forgotPin);
 
   // Set PIN sheet
-  document.getElementById('btn-cancel-set-pin').addEventListener('click', () => { closeSheet('sheet-set-pin'); AppState._pendingHideFeedId=null; });
+  document.getElementById('btn-cancel-set-pin').addEventListener('click', () => { closeSheet('sheet-set-pin'); AppState.pendingHideFeedId=null; });
   document.getElementById('btn-save-set-pin').addEventListener('click', saveSetPin);
 
   // Toggle hide feed
