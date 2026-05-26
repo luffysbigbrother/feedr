@@ -1008,7 +1008,7 @@ function renderAddBar() {
 
 // ── City pill — outlined style, visually distinct from filled platform pills
 function cityPillHTML(city) {
-  if (!city || !city.trim()) return `<span class="acct-no-city">no city set</span>`;
+  if (!city || !city.trim()) return '';
   return `<span class="city-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(city)}</span>`;
 }
 
