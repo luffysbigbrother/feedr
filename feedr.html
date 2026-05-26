@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Feedr">
 <meta name="theme-color" content="#ffffff">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Feedr</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -457,12 +460,24 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 let _uidCounter = 0;
 const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
-// ── Option 2: App version — increment this string for every release ────────
-// Format: YYYY.MM.DD.n (year.month.day.build)
-// Never change STORAGE_KEY — change APP_VERSION instead.
-// MigrationService runs automatically when version in storage differs from this.
-const APP_VERSION  = '2026.05.25.3';
+// ── App version — increment for every release ────────────────────────────
+// Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
+const APP_VERSION  = '2026.05.25.4';
 const VERSION_KEY  = 'feedr_appversion';
+
+// Force hard reload if Safari is serving a stale cached version.
+// Compares the version embedded in this file against the last-seen version.
+// If they differ, the new file is running — stamp it and continue normally.
+// If they match, we're current — no reload needed.
+(function bustCache() {
+  const stored = localStorage.getItem(VERSION_KEY);
+  if (stored && stored !== APP_VERSION) {
+    // New version detected — stamp immediately so reload doesn't loop
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    // Force Safari to fetch fresh copy from server, bypassing PWA cache
+    window.location.reload(true);
+  }
+})();
 
 // ── Platform Registry (Open/Closed — extend here only) ────────────────────
 const PLATFORMS = {
