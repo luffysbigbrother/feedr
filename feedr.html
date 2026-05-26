@@ -136,7 +136,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .btn-open{padding:6px 14px;border-radius:var(--radius-full);background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-remove{width:30px;height:30px;border-radius:var(--radius-full);background:rgba(255,59,48,0.12);border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-remove svg{width:14px;height:14px;}
-.city-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;background:transparent;border:1px solid var(--border);color:var(--text2);}
+.city-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;background:transparent;border:1px solid var(--border);color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .city-pill svg{width:10px;height:10px;flex-shrink:0;}
 .acct-no-city{font-size:11px;color:var(--text3);font-style:italic;}
 .no-results{padding:32px 16px;text-align:center;color:var(--text2);font-size:15px;}
@@ -462,19 +462,18 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
 // ── App version — increment for every release ────────────────────────────
 // Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
-const APP_VERSION  = '2026.05.25.4';
+const APP_VERSION  = '2026.05.25.6';
 const VERSION_KEY  = 'feedr_appversion';
 
 // Force hard reload if Safari is serving a stale cached version.
-// Compares the version embedded in this file against the last-seen version.
-// If they differ, the new file is running — stamp it and continue normally.
-// If they match, we're current — no reload needed.
+// bustCache ONLY triggers the reload — it never stamps VERSION_KEY.
+// Stamping is owned exclusively by MigrationService in init() so migration
+// always runs correctly before the version is marked as seen.
+// Loop prevention: after reload, init() stamps the new version, so on the
+// second load stored === APP_VERSION and bustCache exits immediately.
 (function bustCache() {
   const stored = localStorage.getItem(VERSION_KEY);
   if (stored && stored !== APP_VERSION) {
-    // New version detected — stamp immediately so reload doesn't loop
-    localStorage.setItem(VERSION_KEY, APP_VERSION);
-    // Force Safari to fetch fresh copy from server, bypassing PWA cache
     window.location.reload(true);
   }
 })();
@@ -585,7 +584,7 @@ const Repo = (() => {
     getCreds:   ()     => loadC(),
     saveCreds:  (c)    => saveC(c),
     clearCreds: ()     => { try { localStorage.removeItem('feedr_creds'); } catch {} },
-    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); } catch {} },
+    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); localStorage.removeItem('feedr_last_synced'); } catch {} },
     getHidden:  ()     => { try { return JSON.parse(localStorage.getItem('feedr_hidden')) || { feeds:[] }; } catch { return { feeds:[] }; } },
     saveHidden: (d)    => { try { localStorage.setItem('feedr_hidden', JSON.stringify(d)); } catch(e) { console.error('Repo.saveHidden',e); } },
     getHiddenFeeds: () => { try { return JSON.parse(localStorage.getItem('feedr_hidden'))?.feeds || []; } catch { return []; } },
@@ -595,15 +594,19 @@ const Repo = (() => {
   };
 })();
 
-// ── PinService — PIN stored locally only, never synced ───────────────────
+// ── PinService — PIN hashed before storage, never stored as plaintext ───────
 const PinService = {
   KEY: 'feedr_pin',
-  get()         { return localStorage.getItem(this.KEY) || null; },
-  set(pin)      { localStorage.setItem(this.KEY, pin); },
-  clear()       { localStorage.removeItem(this.KEY); },
-  exists()      { return !!this.get(); },
-  verify(pin)   { return this.get() === pin; },
-  wipeHidden()  { Repo.clearHidden(); this.clear(); }
+  // djb2 hash — simple, no crypto dependency, sufficient for a 4-digit PIN
+  _hash(pin) {
+    let h = 5381;
+    for (let i = 0; i < pin.length; i++) h = ((h << 5) + h) + pin.charCodeAt(i);
+    return (h >>> 0).toString(36);
+  },
+  set(pin)    { try { localStorage.setItem(this.KEY, this._hash(pin)); } catch {} },
+  clear()     { try { localStorage.removeItem(this.KEY); } catch {} },
+  exists()    { return !!localStorage.getItem(this.KEY); },
+  verify(pin) { return localStorage.getItem(this.KEY) === this._hash(pin); }
 };
 
 // ── Fix 4: GistService.read uses single network call ─────────────────────
@@ -668,6 +671,7 @@ const AppState = {
   pinTapCount:          0,
   pinTapTimer:          null,
   pendingHideFeedId:    null,   // feed awaiting PIN setup before hide completes
+  _wasHiddenVisible:    false,  // tracks hidden state across background/foreground cycle
   reset() {
     this.currentFeedId     = null;
     this.currentFeedHidden = false;
@@ -721,23 +725,37 @@ async function syncToGist() {
   catch { setSyncStatus('error','Sync failed — check connection'); }
 }
 
-// ── Fix 15: manualSync checks lastSyncedAt before hitting network ─────────
+// ── SyncTimer — lastSyncedAt stored separately so Gist pulls never wipe it
+const SyncTimer = {
+  KEY: 'feedr_last_synced',
+  get()    { return parseInt(localStorage.getItem(this.KEY) || '0', 10); },
+  stamp()  { try { localStorage.setItem(this.KEY, Date.now()); } catch {} },
+  isStale(ms) { return (Date.now() - this.get()) > ms; }
+};
+
 async function manualSync(force = false) {
-  const creds = Repo.getCreds();
-  if (!creds.token || !creds.gistId) return;
-  const data = Repo.getAllData();
+  const creds       = Repo.getCreds();
   const fiveMinutes = 5 * 60 * 1000;
-  if (!force && data.lastSyncedAt && (Date.now() - data.lastSyncedAt) < fiveMinutes) return;
-  setSyncStatus('syncing','Syncing…');
+  if (!creds.token || !creds.gistId) return;
+  if (!force && !SyncTimer.isStale(fiveMinutes)) return;
+  setSyncStatus('syncing', 'Syncing…');
   try {
     const remote = await GistService.read(creds.token, creds.gistId);
-    if (remote && remote.feeds) { Repo.replaceAll(remote); renderHome(); }
-    const updated = Repo.getAllData();
-    updated.lastSyncedAt = Date.now();
-    Repo.replaceAll(updated);
-    await GistService.write(creds.token, creds.gistId, updated);
-    setSyncStatus('ok','Synced');
-  } catch { setSyncStatus('error','Sync failed'); toast('Sync failed — check your connection'); }
+    if (remote && remote.feeds) {
+      const local = Repo.getAllData();
+      // Only overwrite and re-render if remote differs — compare serialised feeds
+      // as a lightweight change signal rather than a deep object comparison
+      const remoteStr = JSON.stringify(remote.feeds);
+      const localStr  = JSON.stringify(local.feeds);
+      if (remoteStr !== localStr) {
+        Repo.replaceAll(remote);
+        renderHome();
+      }
+    }
+    await GistService.write(creds.token, creds.gistId, Repo.getAllData());
+    SyncTimer.stamp();
+    setSyncStatus('ok', 'Synced');
+  } catch { setSyncStatus('error', 'Sync failed'); toast('Sync failed — check your connection'); }
 }
 
 // ── Platform rendering helpers (Fix 7: dark evaluated once per call) ──────
@@ -755,6 +773,12 @@ function feedPlatformSummary(accounts) {
     if (!p) return '';
     return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${dark?p.darkBg:p.bg};color:${dark?p.darkColor:p.color};">${esc(p.label)}</span>`;
   }).join('');
+}
+
+// ── City pill — outlined style, visually distinct from filled platform pills
+function cityPillHTML(city) {
+  if (!city || !city.trim()) return '';
+  return `<span class="city-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(city)}</span>`;
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -1019,12 +1043,6 @@ function renderAddBar() {
       <input id="inp-display-name" type="text" placeholder="Display name — optional e.g. FRED HAMPTON" maxlength="50" autocorrect="off" spellcheck="false"/>
     </div>
   </div>`;
-}
-
-// ── City pill — outlined style, visually distinct from filled platform pills
-function cityPillHTML(city) {
-  if (!city || !city.trim()) return '';
-  return `<span class="city-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(city)}</span>`;
 }
 
 function renderAccountList(accounts, totalCount) {
@@ -1465,7 +1483,8 @@ function pinKeyPress(key) {
 
 function forgotPin() {
   AppState.hiddenVisible = false;
-  PinService.wipeHidden();
+  Repo.clearHidden();
+  PinService.clear();
   closePinOverlay();
   renderHome();
 }
@@ -1474,7 +1493,7 @@ function saveSetPin() {
   const p1 = document.getElementById('inp-pin-new').value;
   const p2 = document.getElementById('inp-pin-confirm').value;
   const err = document.getElementById('pin-set-error');
-  if (p1.length !== 4 || !/^\d{4}$/.test(p1)) { err.textContent='PIN must be exactly 4 digits'; return; }
+  if (!/^\d{4}$/.test(p1)) { err.textContent='PIN must be exactly 4 digits'; return; }
   if (p1 !== p2) { err.textContent='PINs do not match'; return; }
   PinService.set(p1);
   closeSheet('sheet-set-pin');
@@ -1493,13 +1512,15 @@ function handleSyncDotTap() {
   clearTimeout(AppState.pinTapTimer);
   if (AppState.pinTapCount >= 3) {
     AppState.pinTapCount = 0;
+    // No PIN exists → always show setup sheet so user can create one
+    // PIN exists → show overlay to enter it
     if (PinService.exists()) openPinOverlay();
-    else if (Repo.getHiddenFeeds().length === 0) openSheet('sheet-set-pin');
-    else openPinOverlay();
+    else openSheet('sheet-set-pin');
     return;
   }
+  // Fix 10: single tap respects debounce — no forced sync on accidental taps
   AppState.pinTapTimer = setTimeout(() => {
-    if (AppState.pinTapCount === 1) manualSync(true);
+    if (AppState.pinTapCount === 1) manualSync();
     AppState.pinTapCount = 0;
   }, 400);
 }
@@ -1507,14 +1528,19 @@ function handleSyncDotTap() {
 // Auto-hide on background
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    AppState.hiddenVisible  = false;
-    AppState.feedReorderMode = false;
+    AppState._wasHiddenVisible = AppState.hiddenVisible;
+    AppState.hiddenVisible     = false;
+    AppState.feedReorderMode   = false;
     closePinOverlay();
   }
   if (document.visibilityState === 'visible') {
     window.scrollTo(0, 0);
     document.documentElement.style.zoom = '1';
-    renderHome();
+    // Only re-render if hidden feeds were visible — otherwise home is already correct
+    if (AppState._wasHiddenVisible) {
+      AppState._wasHiddenVisible = false;
+      renderHome();
+    }
   }
 });
 
