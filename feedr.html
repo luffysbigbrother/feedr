@@ -471,7 +471,7 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
 // ── App version — increment for every release ────────────────────────────
 // Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
-const APP_VERSION  = '2026.05.25.8';
+const APP_VERSION  = '2026.05.25.9';
 const VERSION_KEY  = 'feedr_appversion';
 
 // Force hard reload if Safari is serving a stale cached version.
@@ -1748,11 +1748,14 @@ function bindAppEvents() {
   document.getElementById('search-input').addEventListener('input', onSearch);
   document.getElementById('search-clear').addEventListener('click', clearSearch);
 
-  // Sort dropdown
-  document.getElementById('btn-sort').addEventListener('click', e => { e.stopPropagation(); document.getElementById('sort-menu').classList.toggle('open'); });
+  // Sort dropdowns — home and feed share CSS class but have distinct IDs
+  document.getElementById('btn-sort').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('feed-sort-menu').classList.remove('open');
+    document.getElementById('sort-menu').classList.toggle('open');
+  });
   document.getElementById('sort-custom').addEventListener('click', () => toggleHomeSort('custom'));
   document.getElementById('sort-az').addEventListener('click', () => toggleHomeSort('az'));
-  document.addEventListener('click', e => { if (!e.target.closest('.sort-dropdown')) document.getElementById('sort-menu').classList.remove('open'); });
 
   // Sync dot triple tap
   document.getElementById('sync-bar').addEventListener('click', handleSyncDotTap);
@@ -1762,13 +1765,20 @@ function bindAppEvents() {
   document.getElementById('btn-feed-reorder').addEventListener('click', toggleFeedReorder);
   document.getElementById('btn-feed-sort').addEventListener('click', e => {
     e.stopPropagation();
+    document.getElementById('sort-menu').classList.remove('open');
     document.getElementById('feed-sort-menu').classList.toggle('open');
   });
   document.getElementById('feed-sort-menu').addEventListener('click', e => {
     const item = e.target.closest('[data-feed-sort]');
     if (item) toggleFeedSort(item.dataset.feedSort);
   });
+
+  // Single unified document click handler — closes whichever menu is open
+  // when user clicks outside. Replaces the two conflicting global listeners.
   document.addEventListener('click', e => {
+    if (!e.target.closest('#btn-sort') && !e.target.closest('#sort-menu')) {
+      document.getElementById('sort-menu')?.classList.remove('open');
+    }
     if (!e.target.closest('#btn-feed-sort') && !e.target.closest('#feed-sort-menu')) {
       document.getElementById('feed-sort-menu')?.classList.remove('open');
     }
