@@ -312,10 +312,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
       <div class="nav-title" id="feed-nav-title">Feed</div>
       <div class="nav-right">
-        <button class="nav-btn" id="btn-feed-reorder" style="font-size:15px;">Reorder</button>
-        <button class="nav-icon-btn" id="btn-feed-sort" aria-label="Sort accounts">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+        <button class="nav-icon-btn" id="btn-feed-reorder" aria-label="Reorder accounts" title="Reorder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><polyline points="8 6 3 9 8 12"/><polyline points="16 18 21 15 16 12"/></svg>
         </button>
+        <div class="sort-dropdown">
+          <button class="sort-btn" id="btn-feed-sort" aria-label="Sort accounts">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+          </button>
+          <div class="sort-menu" id="feed-sort-menu">
+            <div class="sort-menu-item active" id="feed-sort-custom" data-feed-sort="custom">Custom order <span class="sort-check">&#x2022;</span></div>
+            <div class="sort-menu-item" id="feed-sort-az" data-feed-sort="az">A to Z <span class="sort-check">&#x2022;</span></div>
+            <div class="sort-menu-item" id="feed-sort-city" data-feed-sort="city">By city <span class="sort-check">&#x2022;</span></div>
+          </div>
+        </div>
         <button class="nav-icon-btn" id="btn-edit-feed" aria-label="Edit feed">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -462,7 +471,7 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
 // ── App version — increment for every release ────────────────────────────
 // Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
-const APP_VERSION  = '2026.05.25.7';
+const APP_VERSION  = '2026.05.25.8';
 const VERSION_KEY  = 'feedr_appversion';
 
 // Force hard reload if Safari is serving a stale cached version.
@@ -660,7 +669,7 @@ const AppState = {
   searchQuery:          '',
   reorderMode:          false,
   feedReorderMode:      false,
-  feedSortAZ:           false,
+  feedSortMode:         'custom',  // 'custom' | 'az' | 'city'
   homeSortAZ:           false,
   syncTimer:            null,
   detectedPlatform:     null,
@@ -680,7 +689,7 @@ const AppState = {
     this.manualPlatform    = null;
     this.editingAccountId  = null;
     this.feedReorderMode   = false;
-    this.feedSortAZ        = false;
+    this.feedSortMode      = 'custom';
   },
   resetAddBar() { this.detectedPlatform = null; this.manualPlatform = null; }
 };
@@ -1061,9 +1070,12 @@ function renderAccountList(accounts, totalCount) {
   if (!accounts.length) {
     return `<div class="no-results">No accounts match your search</div>`;
   }
-  let sorted = AppState.feedSortAZ
-    ? [...accounts].sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username))
-    : accounts;
+  let sorted = accounts;
+  if (AppState.feedSortMode === 'az') {
+    sorted = [...accounts].sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username));
+  } else if (AppState.feedSortMode === 'city') {
+    sorted = [...accounts].sort((a, b) => (a.city || '').localeCompare(b.city || ''));
+  }
   const reorder = AppState.feedReorderMode;
 
   const rows = sorted.map(a => {
@@ -1201,7 +1213,7 @@ function openFeed(id, isHidden=false) {
   AppState.detectedPlatform = null;
   AppState.manualPlatform   = null;
   AppState.feedReorderMode  = false;
-  AppState.feedSortAZ       = false;
+  AppState.feedSortMode     = 'custom';
   document.getElementById('search-input').value = '';
   document.getElementById('search-clear').style.display = 'none';
   showScreen('screen-feed');
@@ -1568,12 +1580,28 @@ document.addEventListener('visibilitychange', () => {
 // ── Feed account reorder ───────────────────────────────────────────────────
 function toggleFeedReorder() {
   AppState.feedReorderMode = !AppState.feedReorderMode;
-  document.getElementById('btn-feed-reorder').textContent = AppState.feedReorderMode ? 'Done' : 'Reorder';
+  const btn = document.getElementById('btn-feed-reorder');
+  if (btn) {
+    btn.style.background = AppState.feedReorderMode ? 'var(--blue)' : '';
+    btn.style.color      = AppState.feedReorderMode ? '#fff' : '';
+  }
   renderFeed();
 }
 
-function toggleFeedSortAZ() {
-  AppState.feedSortAZ = !AppState.feedSortAZ;
+function toggleFeedSort(mode) {
+  AppState.feedSortMode = mode;
+  // Update active state on feed sort menu items
+  document.querySelectorAll('[data-feed-sort]').forEach(item => {
+    const isActive = item.dataset.feedSort === mode;
+    item.classList.toggle('active', isActive);
+  });
+  document.getElementById('feed-sort-menu').classList.remove('open');
+  // Highlight reorder icon blue only in custom mode
+  const reorderBtn = document.getElementById('btn-feed-reorder');
+  if (reorderBtn) {
+    reorderBtn.style.background = AppState.feedReorderMode ? 'var(--blue)' : '';
+    reorderBtn.style.color      = AppState.feedReorderMode ? '#fff' : '';
+  }
   renderFeed();
 }
 
@@ -1732,7 +1760,19 @@ function bindAppEvents() {
 
   // Feed reorder and sort
   document.getElementById('btn-feed-reorder').addEventListener('click', toggleFeedReorder);
-  document.getElementById('btn-feed-sort').addEventListener('click', toggleFeedSortAZ);
+  document.getElementById('btn-feed-sort').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('feed-sort-menu').classList.toggle('open');
+  });
+  document.getElementById('feed-sort-menu').addEventListener('click', e => {
+    const item = e.target.closest('[data-feed-sort]');
+    if (item) toggleFeedSort(item.dataset.feedSort);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#btn-feed-sort') && !e.target.closest('#feed-sort-menu')) {
+      document.getElementById('feed-sort-menu')?.classList.remove('open');
+    }
+  });
 
   // PIN overlay keypad
   document.getElementById('pin-keypad').addEventListener('click', e => { const btn=e.target.closest('.pin-key'); if(btn) pinKeyPress(btn.dataset.key); });
