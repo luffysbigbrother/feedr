@@ -462,7 +462,7 @@ const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
 // ── App version — increment for every release ────────────────────────────
 // Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
-const APP_VERSION  = '2026.05.25.6';
+const APP_VERSION  = '2026.05.25.7';
 const VERSION_KEY  = 'feedr_appversion';
 
 // Force hard reload if Safari is serving a stale cached version.
@@ -1029,7 +1029,15 @@ function renderAddBar() {
     return `<button class="pp-btn${sel?' selected':''}" style="background:${bg};color:${color};border-color:${border};" data-platform="${k}">${esc(p.label)}</button>`;
   }).join('');
 
+  // Build datalist from cities already used in this feed — native iOS autocomplete
+  const feed = getCurrentFeed();
+  const usedCities = feed
+    ? [...new Set(feed.accounts.map(a => a.city).filter(Boolean))].sort()
+    : [];
+  const cityOptions = usedCities.map(c => `<option value="${esc(c)}">`).join('');
+
   return `<div class="add-section">
+    <datalist id="city-suggestions">${cityOptions}</datalist>
     <div class="add-bar">
       <input id="inp-add-account" type="text" placeholder="Paste a link or @username" maxlength="200" autocorrect="off" autocapitalize="none" spellcheck="false"/>
       <button class="add-btn" id="btn-add-account">Add</button>
@@ -1041,6 +1049,10 @@ function renderAddBar() {
     <div class="platform-picker" id="platform-picker">${ppBtns}</div>
     <div class="display-name-row" id="display-name-row" style="display:none;">
       <input id="inp-display-name" type="text" placeholder="Display name — optional e.g. FRED HAMPTON" maxlength="50" autocorrect="off" spellcheck="false"/>
+    </div>
+    <div class="display-name-row" id="city-row" style="display:none;">
+      <input id="inp-add-city" type="text" placeholder="City — optional e.g. Atlanta, GA" maxlength="60"
+        list="city-suggestions" autocorrect="off" spellcheck="false"/>
     </div>
   </div>`;
 }
@@ -1222,7 +1234,9 @@ function onAddInput() {
       picker.classList.remove('visible');
       inp.classList.add('detected');
       const dnRow = document.getElementById('display-name-row');
+      const cityRow = document.getElementById('city-row');
       if (dnRow) dnRow.style.display = 'flex';
+      if (cityRow) cityRow.style.display = 'flex';
     } else {
       strip.classList.remove('visible');
       picker.classList.remove('visible');
@@ -1233,7 +1247,9 @@ function onAddInput() {
     picker.classList.add('visible');
     inp.classList.remove('detected');
     const dnRow = document.getElementById('display-name-row');
+    const cityRow = document.getElementById('city-row');
     if (dnRow) dnRow.style.display = 'flex';
+    if (cityRow) cityRow.style.display = 'flex';
   }
 }
 
@@ -1252,7 +1268,9 @@ function selectManualPlatform(platform) {
     btn.classList.toggle('selected', sel);
   });
   const dnRow = document.getElementById('display-name-row');
+  const cityRow = document.getElementById('city-row');
   if (dnRow) dnRow.style.display = 'flex';
+  if (cityRow) cityRow.style.display = 'flex';
   document.getElementById('inp-add-account')?.focus();
 }
 
@@ -1273,12 +1291,15 @@ function addAccount() {
     toast('Already in this feed'); inp.value=''; return;
   }
 
-  const dnInp = document.getElementById('inp-display-name');
-  const displayName = dnInp ? dnInp.value.trim() : '';
-  feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, displayName, addedAt:Date.now() });
+  const dnInp   = document.getElementById('inp-display-name');
+  const cityInp = document.getElementById('inp-add-city');
+  const displayName = dnInp   ? dnInp.value.trim()   : '';
+  const city        = cityInp ? cityInp.value.trim()  : '';
+  feed.accounts.push({ id:uid(), username:result.username, platform:result.platform, displayName, city, addedAt:Date.now() });
   saveCurrentFeed(feed);
-  inp.value='';
-  if (dnInp) dnInp.value='';
+  inp.value = '';
+  if (dnInp)   dnInp.value   = '';
+  if (cityInp) cityInp.value = '';
   AppState.resetAddBar();
   scheduleSyncToGist();
   renderFeed();
