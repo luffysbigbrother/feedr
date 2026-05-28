@@ -130,18 +130,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .account-row:not(:last-child){border-bottom:0.5px solid var(--border);}
 .avatar{width:42px;height:42px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff;flex-shrink:0;}
 .account-info{flex:1;min-width:0;}
-.account-username{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .platform-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;margin-top:3px;}
 .account-row-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;}
 .btn-open{padding:6px 14px;border-radius:var(--radius-full);background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-remove{width:30px;height:30px;border-radius:var(--radius-full);background:rgba(255,59,48,0.12);border:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-remove svg{width:14px;height:14px;}
-.city-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;background:transparent;border:1px solid var(--border);color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.city-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500;background:transparent;border:1px solid var(--border);color:var(--text2);white-space:nowrap;}
 .city-pill svg{width:10px;height:10px;flex-shrink:0;}
-.acct-no-city{font-size:11px;color:var(--text3);font-style:italic;}
 .no-results{padding:32px 16px;text-align:center;color:var(--text2);font-size:15px;}
 .acct-display-name{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.acct-username-line{display:flex;align-items:center;gap:6px;margin-top:2px;}
+.acct-username-line{display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;}
 .acct-username-sub{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .acct-username-only{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .btn-edit-acct{width:30px;height:30px;border-radius:var(--radius-full);background:var(--surface2);border:0.5px solid var(--border);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -469,10 +467,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 let _uidCounter = 0;
 const uid = () => `${Date.now().toString(36)}${(++_uidCounter).toString(36)}`;
 
+// ── StorageKeys — single inventory of every localStorage key in the app ───
+// Rename here and it renames everywhere. A typo here fails loudly at startup.
+const StorageKeys = Object.freeze({
+  FEEDS:       'feedr_v4',
+  CREDS:       'feedr_creds',
+  HIDDEN:      'feedr_hidden',
+  PIN:         'feedr_pin',
+  VERSION:     'feedr_appversion',
+  LAST_SYNCED: 'feedr_last_synced'
+});
+
 // ── App version — increment for every release ────────────────────────────
-// Format: YYYY.MM.DD.n  Never change STORAGE_KEY, only APP_VERSION.
-const APP_VERSION  = '2026.05.25.9';
-const VERSION_KEY  = 'feedr_appversion';
+// Format: YYYY.MM.DD.n  Never change StorageKeys.FEEDS, only APP_VERSION.
+const APP_VERSION = '2026.05.28.1';
 
 // Force hard reload if Safari is serving a stale cached version.
 // bustCache ONLY triggers the reload — it never stamps VERSION_KEY.
@@ -480,8 +488,13 @@ const VERSION_KEY  = 'feedr_appversion';
 // always runs correctly before the version is marked as seen.
 // Loop prevention: after reload, init() stamps the new version, so on the
 // second load stored === APP_VERSION and bustCache exits immediately.
+// bustCache: fires before any render. Three cases:
+//   stored === null       → fresh install, no cached file exists, proceed normally
+//   stored === APP_VERSION → current version already running, proceed normally
+//   stored !== APP_VERSION → stale cache detected, force reload to fetch new file
+// Never stamps VERSION — init() owns that through MigrationService exclusively.
 (function bustCache() {
-  const stored = localStorage.getItem(VERSION_KEY);
+  const stored = localStorage.getItem(StorageKeys.VERSION);
   if (stored && stored !== APP_VERSION) {
     window.location.reload(true);
   }
@@ -497,8 +510,19 @@ const PLATFORMS = {
 };
 const PLATFORM_KEYS = Object.keys(PLATFORMS);
 
-// ── Fix 7: dark mode evaluated once per render, not per element ───────────
-const Theme = { isDark: () => window.matchMedia('(prefers-color-scheme: dark)').matches };
+// ── Theme — isDark cached per render cycle, not called per element ──────────
+const Theme = (() => {
+  let _dark = null;
+  let _frame = -1;
+  return {
+    // Returns cached value within same render frame, re-evaluates each new frame
+    isDark() {
+      const frame = performance.now() | 0;
+      if (frame !== _frame) { _dark = window.matchMedia('(prefers-color-scheme: dark)').matches; _frame = frame; }
+      return _dark;
+    }
+  };
+})();
 
 // ── URL Detection Service (Fix 13: explicit PLATFORM_KEYS dependency) ─────
 const UrlDetector = ((platformKeys) => {
@@ -537,12 +561,12 @@ const UrlDetector = ((platformKeys) => {
 const MigrationService = {
   // Returns true if stored version differs from current app version
   needsMigration() {
-    return localStorage.getItem(VERSION_KEY) !== APP_VERSION;
+    return localStorage.getItem(StorageKeys.VERSION) !== APP_VERSION;
   },
 
   // Stamp the current version into storage after migration completes
   stampVersion() {
-    try { localStorage.setItem(VERSION_KEY, APP_VERSION); } catch(e) { console.error('MigrationService.stampVersion', e); }
+    try { localStorage.setItem(StorageKeys.VERSION, APP_VERSION); } catch(e) { console.error('MigrationService.stampVersion', e); }
   },
 
   // Run all data migrations. Safe to call on any data — each step is idempotent.
@@ -576,36 +600,49 @@ const MigrationService = {
   }
 };
 
-// ── Repository (no migration on every read — Fix 3) ───────────────────────
+// ── Repo — visible feed and credential storage ────────────────────────────
 const Repo = (() => {
-  const load  = ()  => { try { return JSON.parse(localStorage.getItem('feedr_v4')) || { feeds:[] }; } catch { return { feeds:[] }; } };
-  const save  = (d) => { try { localStorage.setItem('feedr_v4', JSON.stringify(d)); } catch(e) { console.error('Repo.save',e); } };
-  const loadC = ()  => { try { return JSON.parse(localStorage.getItem('feedr_creds')) || {}; } catch { return {}; } };
-  const saveC = (c) => { try { localStorage.setItem('feedr_creds', JSON.stringify(c)); } catch(e) { console.error('Repo.saveC',e); } };
+  const load  = ()  => { try { return JSON.parse(localStorage.getItem(StorageKeys.FEEDS))  || { feeds:[] }; } catch { return { feeds:[] }; } };
+  const save  = (d) => { try { localStorage.setItem(StorageKeys.FEEDS, JSON.stringify(d)); } catch(e) { console.error('Repo.save', e); } };
+  const loadC = ()  => { try { return JSON.parse(localStorage.getItem(StorageKeys.CREDS))  || {}; } catch { return {}; } };
+  const saveC = (c) => { try { localStorage.setItem(StorageKeys.CREDS, JSON.stringify(c)); } catch(e) { console.error('Repo.saveC', e); } };
   return {
     getFeeds:   ()     => load().feeds,
-    getFeed:    (id)   => load().feeds.find(f=>f.id===id) || null,
-    saveFeed:   (feed) => { const d=load(); const i=d.feeds.findIndex(f=>f.id===feed.id); i>=0?d.feeds[i]=feed:d.feeds.push(feed); save(d); },
-    deleteFeed: (id)   => { const d=load(); d.feeds=d.feeds.filter(f=>f.id!==id); save(d); },
-    reorder:    (ids)  => { const d=load(); d.feeds=ids.map(id=>d.feeds.find(f=>f.id===id)).filter(Boolean); save(d); },
+    getFeed:    (id)   => load().feeds.find(f => f.id === id) || null,
+    saveFeed:   (feed) => { const d = load(); const i = d.feeds.findIndex(f => f.id === feed.id); i >= 0 ? d.feeds[i] = feed : d.feeds.push(feed); save(d); },
+    deleteFeed: (id)   => { const d = load(); d.feeds = d.feeds.filter(f => f.id !== id); save(d); },
+    reorder:    (ids)  => { const d = load(); d.feeds = ids.map(id => d.feeds.find(f => f.id === id)).filter(Boolean); save(d); },
     getAllData:  ()     => load(),
     replaceAll: (data) => save(data),
     getCreds:   ()     => loadC(),
     saveCreds:  (c)    => saveC(c),
-    clearCreds: ()     => { try { localStorage.removeItem('feedr_creds'); } catch {} },
-    clearAll:   ()     => { try { localStorage.removeItem('feedr_v4'); localStorage.removeItem('feedr_creds'); localStorage.removeItem('feedr_last_synced'); } catch {} },
-    getHidden:  ()     => { try { return JSON.parse(localStorage.getItem('feedr_hidden')) || { feeds:[] }; } catch { return { feeds:[] }; } },
-    saveHidden: (d)    => { try { localStorage.setItem('feedr_hidden', JSON.stringify(d)); } catch(e) { console.error('Repo.saveHidden',e); } },
-    getHiddenFeeds: () => { try { return JSON.parse(localStorage.getItem('feedr_hidden'))?.feeds || []; } catch { return []; } },
-    saveHiddenFeed: (feed) => { const d=JSON.parse(localStorage.getItem('feedr_hidden')||'{"feeds":[]}'); const i=d.feeds.findIndex(f=>f.id===feed.id); i>=0?d.feeds[i]=feed:d.feeds.push(feed); localStorage.setItem('feedr_hidden',JSON.stringify(d)); },
-    deleteHiddenFeed: (id) => { const d=JSON.parse(localStorage.getItem('feedr_hidden')||'{"feeds":[]}'); d.feeds=d.feeds.filter(f=>f.id!==id); localStorage.setItem('feedr_hidden',JSON.stringify(d)); },
-    clearHidden: ()    => { try { localStorage.removeItem('feedr_hidden'); } catch {} }
+    clearCreds: ()     => { try { localStorage.removeItem(StorageKeys.CREDS); } catch {} },
+    clearAll:   ()     => {
+      try {
+        localStorage.removeItem(StorageKeys.FEEDS);
+        localStorage.removeItem(StorageKeys.CREDS);
+        localStorage.removeItem(StorageKeys.LAST_SYNCED);
+      } catch {}
+    }
+  };
+})();
+
+// ── HiddenRepo — hidden feed storage, mirrors Repo pattern ───────────────
+const HiddenRepo = (() => {
+  const load = () => { try { return JSON.parse(localStorage.getItem(StorageKeys.HIDDEN)) || { feeds:[] }; } catch { return { feeds:[] }; } };
+  const save = (d) => { try { localStorage.setItem(StorageKeys.HIDDEN, JSON.stringify(d)); } catch(e) { console.error('HiddenRepo.save', e); } };
+  return {
+    getFeeds:   ()     => load().feeds,
+    getFeed:    (id)   => load().feeds.find(f => f.id === id) || null,
+    saveFeed:   (feed) => { const d = load(); const i = d.feeds.findIndex(f => f.id === feed.id); i >= 0 ? d.feeds[i] = feed : d.feeds.push(feed); save(d); },
+    deleteFeed: (id)   => { const d = load(); d.feeds = d.feeds.filter(f => f.id !== id); save(d); },
+    clearAll:   ()     => { try { localStorage.removeItem(StorageKeys.HIDDEN); } catch {} }
   };
 })();
 
 // ── PinService — PIN hashed before storage, never stored as plaintext ───────
 const PinService = {
-  KEY: 'feedr_pin',
+  KEY: StorageKeys.PIN,
   // djb2 hash — simple, no crypto dependency, sufficient for a 4-digit PIN
   _hash(pin) {
     let h = 5381;
@@ -671,7 +708,6 @@ const AppState = {
   feedReorderMode:      false,
   feedSortMode:         'custom',  // 'custom' | 'az' | 'city'
   homeSortAZ:           false,
-  syncTimer:            null,
   detectedPlatform:     null,
   manualPlatform:       null,
   editingAccountId:     null,
@@ -681,15 +717,19 @@ const AppState = {
   pinTapTimer:          null,
   pendingHideFeedId:    null,   // feed awaiting PIN setup before hide completes
   _wasHiddenVisible:    false,  // tracks hidden state across background/foreground cycle
+  // Called only from showHome() — resets all feed-level state when returning home.
+  // Safe to clear currentFeedHidden here because leaving the feed screen
+  // always goes through showHome, never mid-session.
   reset() {
-    this.currentFeedId     = null;
-    this.currentFeedHidden = false;
-    this.searchQuery       = '';
-    this.detectedPlatform  = null;
-    this.manualPlatform    = null;
-    this.editingAccountId  = null;
-    this.feedReorderMode   = false;
-    this.feedSortMode      = 'custom';
+    this.currentFeedId      = null;
+    this.currentFeedHidden  = false;
+    this.searchQuery        = '';
+    this.detectedPlatform   = null;
+    this.manualPlatform     = null;
+    this.editingAccountId   = null;
+    this.feedReorderMode    = false;
+    this.feedSortMode       = 'custom';
+    this.pendingHideFeedId  = null;
   },
   resetAddBar() { this.detectedPlatform = null; this.manualPlatform = null; }
 };
@@ -722,8 +762,7 @@ function setSyncStatus(state, label) {
 }
 
 function scheduleSyncToGist() {
-  clearTimeout(AppState.syncTimer);
-  AppState.syncTimer = setTimeout(syncToGist, 1500);
+  SyncTimer.schedule(syncToGist);
 }
 
 async function syncToGist() {
@@ -734,12 +773,15 @@ async function syncToGist() {
   catch { setSyncStatus('error','Sync failed — check connection'); }
 }
 
-// ── SyncTimer — lastSyncedAt stored separately so Gist pulls never wipe it
+// ── SyncTimer — owns both debounce handle and last-synced timestamp ─────────
 const SyncTimer = {
-  KEY: 'feedr_last_synced',
-  get()    { return parseInt(localStorage.getItem(this.KEY) || '0', 10); },
-  stamp()  { try { localStorage.setItem(this.KEY, Date.now()); } catch {} },
-  isStale(ms) { return (Date.now() - this.get()) > ms; }
+  KEY:    StorageKeys.LAST_SYNCED,
+  _timer: null,
+  get()        { return parseInt(localStorage.getItem(this.KEY) || '0', 10); },
+  stamp()      { try { localStorage.setItem(this.KEY, Date.now()); } catch {} },
+  isStale(ms)  { return (Date.now() - this.get()) > ms; },
+  schedule(fn) { clearTimeout(this._timer); this._timer = setTimeout(fn, 1500); },
+  cancel()     { clearTimeout(this._timer); }
 };
 
 async function manualSync(force = false) {
@@ -790,24 +832,26 @@ function cityPillHTML(city) {
   return `<span class="city-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${esc(city)}</span>`;
 }
 
-// ── Navigation ─────────────────────────────────────────────────────────────
+// ── Navigation helpers ────────────────────────────────────────────────────
+function updateSyncBar() {
+  const creds  = Repo.getCreds();
+  const hasCreds = !!(creds.token && creds.gistId);
+  document.getElementById('sync-bar').style.display    = hasCreds ? 'flex' : 'none';
+  document.getElementById('no-sync-bar').style.display = hasCreds ? 'none' : 'flex';
+  if (hasCreds) setSyncStatus('ok', 'Synced');
+}
+
+function exitReorderMode() {
+  if (!AppState.reorderMode) return;
+  AppState.reorderMode = false;
+  const btn = document.getElementById('btn-reorder');
+  if (btn) { btn.style.background = ''; btn.style.color = ''; }
+  document.getElementById('reorder-bar').classList.remove('visible');
+}
+
 function showHome() {
-  const creds   = Repo.getCreds();
-  const syncBar = document.getElementById('sync-bar');
-  const noSync  = document.getElementById('no-sync-bar');
-  if (creds.token && creds.gistId) {
-    syncBar.style.display = 'flex';
-    noSync.style.display  = 'none';
-    setSyncStatus('ok','Synced');
-  } else {
-    syncBar.style.display = 'none';
-    noSync.style.display  = 'flex';
-  }
-  if (AppState.reorderMode) {
-    AppState.reorderMode = false;
-    document.getElementById('btn-reorder').textContent = 'Reorder';
-    document.getElementById('reorder-bar').classList.remove('visible');
-  }
+  updateSyncBar();
+  exitReorderMode();
   AppState.reset();
   showScreen('screen-home');
   renderHome();
@@ -837,7 +881,7 @@ function renderHome() {
 
   if (AppState.homeSortAZ) feeds = [...feeds].sort((a, b) => a.name.localeCompare(b.name));
 
-  const hiddenFeeds = AppState.hiddenVisible ? Repo.getHiddenFeeds() : [];
+  const hiddenFeeds = AppState.hiddenVisible ? HiddenRepo.getFeeds() : [];
   const hiddenSorted = AppState.homeSortAZ
     ? [...hiddenFeeds].sort((a, b) => a.name.localeCompare(b.name))
     : hiddenFeeds;
@@ -1027,7 +1071,7 @@ function createFeed() {
 }
 
 // ── Fix 12: renderFeed broken into focused sub-renderers ──────────────────
-function renderAddBar() {
+function renderAddBar(feed) {
   const dark = Theme.isDark();
   const ppBtns = PLATFORM_KEYS.map(k => {
     const p   = PLATFORMS[k];
@@ -1039,7 +1083,6 @@ function renderAddBar() {
   }).join('');
 
   // Build datalist from cities already used in this feed — native iOS autocomplete
-  const feed = getCurrentFeed();
   const usedCities = feed
     ? [...new Set(feed.accounts.map(a => a.city).filter(Boolean))].sort()
     : [];
@@ -1121,17 +1164,17 @@ function renderEmptyFeed() {
 // ── Fix 1 & 12: renderFeed uses sub-renderers, preserves input value ──────
 function getCurrentFeed() {
   return AppState.currentFeedHidden
-    ? Repo.getHiddenFeeds().find(f => f.id === AppState.currentFeedId) || null
+    ? HiddenRepo.getFeeds().find(f => f.id === AppState.currentFeedId) || null
     : Repo.getFeed(AppState.currentFeedId);
 }
 
 function saveCurrentFeed(feed) {
-  if (AppState.currentFeedHidden) Repo.saveHiddenFeed(feed);
+  if (AppState.currentFeedHidden) HiddenRepo.saveFeed(feed);
   else Repo.saveFeed(feed);
 }
 
 function deleteCurrentFeed() {
-  if (AppState.currentFeedHidden) Repo.deleteHiddenFeed(AppState.currentFeedId);
+  if (AppState.currentFeedHidden) HiddenRepo.deleteFeed(AppState.currentFeedId);
   else Repo.deleteFeed(AppState.currentFeedId);
 }
 
@@ -1148,7 +1191,7 @@ function renderFeed() {
 
   const currentInputVal = document.getElementById('inp-add-account')?.value || '';
 
-  const addBarHTML     = renderAddBar();
+  const addBarHTML     = renderAddBar(feed);
   const accountsHTML   = feed.accounts.length ? renderAccountList(filtered, feed.accounts.length) : renderEmptyFeed();
 
   el.innerHTML = addBarHTML + accountsHTML;
@@ -1430,14 +1473,14 @@ function deleteFeed() {
 
 function hideFeed(feed) {
   Repo.deleteFeed(feed.id);
-  Repo.saveHiddenFeed(feed);
+  HiddenRepo.saveFeed(feed);
   scheduleSyncToGist();
   toast(`"${feed.name}" hidden`);
   goHome();
 }
 
 function unhideFeed(feed) {
-  Repo.deleteHiddenFeed(feed.id);
+  HiddenRepo.deleteFeed(feed.id);
   Repo.saveFeed(feed);
   scheduleSyncToGist();
   toast(`"${feed.name}" is now visible`);
@@ -1516,27 +1559,34 @@ function pinKeyPress(key) {
 
 function forgotPin() {
   AppState.hiddenVisible = false;
-  Repo.clearHidden();
+  HiddenRepo.clearAll();
   PinService.clear();
   closePinOverlay();
   renderHome();
 }
 
 function saveSetPin() {
-  const p1 = document.getElementById('inp-pin-new').value;
-  const p2 = document.getElementById('inp-pin-confirm').value;
+  const p1  = document.getElementById('inp-pin-new').value;
+  const p2  = document.getElementById('inp-pin-confirm').value;
   const err = document.getElementById('pin-set-error');
-  if (!/^\d{4}$/.test(p1)) { err.textContent='PIN must be exactly 4 digits'; return; }
-  if (p1 !== p2) { err.textContent='PINs do not match'; return; }
+  if (!/^\d{4}$/.test(p1)) { err.textContent = 'PIN must be exactly 4 digits'; return; }
+  if (p1 !== p2)            { err.textContent = 'PINs do not match'; return; }
   PinService.set(p1);
+  clearPinSetupForm();
+  completePinSetup();
+}
+
+function clearPinSetupForm() {
+  document.getElementById('inp-pin-new').value     = '';
+  document.getElementById('inp-pin-confirm').value = '';
+  document.getElementById('pin-set-error').textContent = '';
   closeSheet('sheet-set-pin');
-  document.getElementById('inp-pin-new').value='';
-  document.getElementById('inp-pin-confirm').value='';
-  err.textContent='';
-  if (AppState.pendingHideFeedId) {
-    completeHideFeed(AppState.pendingHideFeedId);
-    AppState.pendingHideFeedId = null;
-  }
+}
+
+function completePinSetup() {
+  if (!AppState.pendingHideFeedId) return;
+  completeHideFeed(AppState.pendingHideFeedId);
+  AppState.pendingHideFeedId = null;
 }
 
 // Triple-tap sync dot to open PIN
@@ -1645,7 +1695,9 @@ async function saveSettings() {
   errEl.textContent = '';
   if (!token || !gistId) { errEl.textContent = 'Both fields are required'; return; }
   try {
-    await GistService.verify(token, gistId);
+    // read() internally fetches the Gist — one network call serves as both
+    // verification and data retrieval, avoiding the double-call from verify()+read()
+    await GistService.read(token, gistId);
     Repo.saveCreds({ token, gistId });
     await syncToGist();
     toast('Settings saved');
@@ -1696,6 +1748,9 @@ function resetApp() {
 function disconnectDevice() {
   if (!confirm('This will remove your token and all feed data from this device. Your GitHub Gist is untouched — reconnect any time with your token and Gist ID to restore everything. Continue?')) return;
   Repo.clearAll();
+  HiddenRepo.clearAll();
+  PinService.clear();
+  AppState.hiddenVisible = false;
   showScreen('screen-setup');
   toast('Device disconnected — your Gist data is safe');
 }
@@ -1834,7 +1889,7 @@ function bindAppEvents() {
 // ── Init — routes to setup when no credentials exist, home when they do ───
 (function init() {
   bindAppEvents();
-  const raw   = localStorage.getItem('feedr_v4');
+  const raw   = localStorage.getItem(StorageKeys.FEEDS);
   const creds = Repo.getCreds();
   if (raw) {
     try {
